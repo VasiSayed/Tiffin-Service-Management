@@ -1,0 +1,63 @@
+{% extends 'tiffin_app/base.html' %}
+
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customers{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'customer_add' %}" class="btn btn-primary">+ Add Customer</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="card">
+        <div class="card-body">
+            <form method="get" class="filters">
+                <div class="search-box">
+                    <input type="text" name="search" class="form-control" placeholder="Search customers..." value="{{ search }}" onkeyup="filterTable(this, 'customer-table')">
+                </div>
+            </form>
+            
+            <div class="table-container">
+                <table class="table" id="customer-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Location</th>
+                            <th>Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for customer in customers %}
+                        <tr>
+                            <td><strong>{{ customer.name }}</strong></td>
+                            <td>{{ customer.contact_number }}</td>
+                            <td>{{ customer.delivery_location }}</td>
+                            <td>
+                                {% if customer.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="table-actions">
+                                <a href="{% url 'customer_edit' customer.pk %}" class="btn btn-sm btn-secondary">Edit</a>
+                                <form method="post" action="{% url 'customer_delete' customer.pk %}" style="display:inline;" onsubmit="return confirmDelete('Delete {{ customer.name }}?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center">No customers found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

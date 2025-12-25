@@ -1,0 +1,155 @@
+{% extends 'tiffin_app/base.html' %}
+
+{% block title %}Monthly Expense Report{% endblock %}
+{% block page_title %}📊 Monthly Expense Report{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'expense_download' %}?year={{ year }}&month={{ month }}" class="btn btn-success">📥 Download CSV</a>
+<a href="{% url 'expense_dashboard' %}" class="btn btn-secondary">← Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <!-- Month Selector -->
+    <div class="card">
+        <div class="card-body">
+            <form method="get" style="display: flex; gap: 15px; align-items: flex-end;">
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label class="form-label">Month</label>
+                    <select name="month" class="form-control">
+                        {% for m in "123456789101112"|make_list %}
+                        <option value="{{ forloop.counter }}" {% if month == forloop.counter %}selected{% endif %}>
+                            {{ forloop.counter|date:"F"|default:forloop.counter }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label class="form-label">Year</label>
+                    <select name="year" class="form-control">
+                        {% for y in "2023,2024,2025,2026"|make_list %}
+                        <option value="{{ y }}" {% if year|stringformat:"s" == y %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">Generate</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Grand Total -->
+    <div class="stats-grid">
+        <div class="stat-card success">
+            <div class="stat-label">Grand Total</div>
+            <div class="stat-value">₹{{ grand_total }}</div>
+        </div>
+    </div>
+
+    <!-- Category-wise Report -->
+    {% if category_wise %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📂 Category-wise Breakdown</h3>
+        </div>
+        <div class="card-body card-body-compact">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Total Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cat in category_wise %}
+                        <tr>
+                            <td><strong>{{ cat.category__icon }} {{ cat.category__name }}</strong></td>
+                            <td><strong>₹{{ cat.total }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Date-wise Report -->
+    {% if date_wise %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📅 Date-wise Expenses</h3>
+        </div>
+        <div class="card-body card-body-compact">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in date_wise %}
+                        <tr>
+                            <td>{{ entry.date|date:"d-M-Y" }}</td>
+                            <td>{{ entry.category__name }}</td>
+                            <td>{{ entry.items_count }} items</td>
+                            <td><strong>₹{{ entry.total }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Item-wise Report -->
+    {% if item_wise %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">🛒 Item-wise Summary</h3>
+        </div>
+        <div class="card-body card-body-compact">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Total Quantity</th>
+                            <th>Avg Rate</th>
+                            <th>Times Purchased</th>
+                            <th>Total Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in item_wise %}
+                        <tr>
+                            <td><strong>{{ item.item_name }}</strong></td>
+                            <td>{{ item.total_qty }} {{ item.unit }}</td>
+                            <td>₹{{ item.avg_rate|floatformat:2 }}</td>
+                            <td>{{ item.times_purchased }}x</td>
+                            <td><strong>₹{{ item.total_amount }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not date_wise and not item_wise %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <div class="empty-state-text">No expenses found</div>
+        <div class="empty-state-hint">No expenses recorded for {{ month }}/{{ year }}</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends 'tiffin_app/base.html' %}
+
+{% block title %}Color Test{% endblock %}
+{% block page_title %}Color Test - Debug{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Tenant Configuration Debug</h2>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <tr>
+                    <td><strong>Tenant Name:</strong></td>
+                    <td>{{ tenant_name }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Tenant Object:</strong></td>
+                    <td>{{ tenant }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Primary Color:</strong></td>
+                    <td style="background: {{ theme_primary }}; color: white; padding: 8px;">{{ theme_primary }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Lunch Sticker Color:</strong></td>
+                    <td style="background: {{ lunch_sticker_color }}; color: white; padding: 8px;">{{ lunch_sticker_color }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Dinner Sticker Color:</strong></td>
+                    <td style="background: {{ dinner_sticker_color }}; color: white; padding: 8px;">{{ dinner_sticker_color }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Logo URL:</strong></td>
+                    <td>{{ logo_url }}</td>
+                </tr>
+                <tr>
+                    <td><strong>User:</strong></td>
+                    <td>{{ user.username }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Role:</strong></td>
+                    <td>{{ user.profile.role }}</td>
+                </tr>
+            </table>
+            
+            <h3 class="mt-3">Test Buttons:</h3>
+            <div class="flex gap-2 mt-2">
+                <button class="btn btn-primary">Primary Button</button>
+                <button class="btn btn-secondary">Secondary Button</button>
+                <button class="btn btn-success">Success Button</button>
+                <button class="btn btn-danger">Danger Button</button>
+            </div>
+            
+            <h3 class="mt-3">CSS Variables Test:</h3>
+            <div style="background: var(--primary); color: white; padding: 20px; margin-top: 10px;">
+                This box should be your primary color
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

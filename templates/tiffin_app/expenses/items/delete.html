@@ -1,0 +1,35 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}Delete Item{% endblock %}
+{% block page_title %}🗑 Delete Item{% endblock %}
+
+{% block top_actions %}
+  <a class="btn btn-secondary" href="{% url 'expense_item_list' %}">← Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+
+  <div class="card">
+    <div class="card-body">
+      <div class="alert alert-error">
+        Are you sure you want to delete <strong>{{ item.name }}</strong>?
+      </div>
+      <div style="margin-bottom:12px; opacity:0.85;">
+        Category: <b>{{ item.category.icon }} {{ item.category.name }}</b>,
+        Unit: <b>{{ item.default_unit }}</b>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Yes, Delete</button>
+        <a href="{% url 'expense_item_list' %}" class="btn btn-secondary">Cancel</a>
+      </form>
+
+      <div style="margin-top:10px; font-size:0.85rem; opacity:0.75;">
+        Note: If this item is used in DailyExpense rows, deletion may fail (PROTECT).
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

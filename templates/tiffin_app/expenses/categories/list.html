@@ -1,0 +1,56 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}Expense Categories{% endblock %}
+{% block page_title %}📦 Expense Categories{% endblock %}
+
+{% block top_actions %}
+  <a class="btn btn-primary" href="{% url 'expense_category_create' %}">➕ Add Category</a>
+  <a class="btn btn-secondary" href="{% url 'expense_dashboard' %}">← Back to Expenses</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+
+  <div class="card">
+    <div class="card-body">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:60px;">Icon</th>
+            <th>Name</th>
+            <th style="width:120px;">Active</th>
+            <th style="width:200px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in categories %}
+          <tr>
+            <td style="font-size:1.2rem;">{{ c.icon }}</td>
+            <td><strong>{{ c.name }}</strong></td>
+            <td>
+              {% if c.is_active %}
+                <span class="badge badge-success">Active</span>
+              {% else %}
+                <span class="badge badge-danger">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="action-buttons">
+              <a class="btn btn-sm btn-success" href="{% url 'expense_category_edit' c.id %}">Edit</a>
+              <a class="btn btn-sm btn-danger" href="{% url 'expense_category_delete' c.id %}">Delete</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-muted">No categories found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div style="margin-top:10px; font-size:0.85rem; opacity:0.75;">
+        Tip: Categories are tenant-scoped. Same name cannot repeat inside same tenant.
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

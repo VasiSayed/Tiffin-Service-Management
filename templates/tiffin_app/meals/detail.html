@@ -1,0 +1,76 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Meal Detail - {{ meal.name }}{% endblock %}
+{% block page_title %}{{ meal.name }}{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="card">
+        <div class="card-header">
+            <div class="flex-between">
+                <div>
+                    <h2 class="card-title">Template Items</h2>
+                    <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.9rem;">
+                        Meal Type: <strong>{{ meal.get_meal_type_display }}</strong> | 
+                        Price: <strong>₹{{ meal.price }}</strong>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'meal_item_add' meal.pk %}" class="filters" style="margin-bottom: 20px;">
+                {% csrf_token %}
+                <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                    <label class="form-label">Dish</label>
+                    <select name="dish" class="form-control" required>
+                        <option value="">Select Dish</option>
+                        {% for dish in dishes %}
+                        <option value="{{ dish.pk }}">{{ dish.name }} ({{ dish.get_category_display }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Default Qty</label>
+                    <input type="number" name="default_qty" class="form-control" value="1" min="1" style="width: 100px;">
+                </div>
+                <div style="align-self: flex-end;">
+                    <button type="submit" class="btn btn-primary">Add Item</button>
+                </div>
+            </form>
+            
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Dish</th>
+                            <th>Portion</th>
+                            <th>Default Qty</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in meal.template_items.all %}
+                        <tr>
+                            <td><strong>{{ item.dish.name }}</strong></td>
+                            <td>{{ item.portion.portion_label|default:'-' }}</td>
+                            <td>{{ item.default_qty }}</td>
+                            <td>
+                                <form method="post" action="{% url 'meal_item_delete' item.pk %}" style="display:inline;" onsubmit="return confirmDelete('Remove {{ item.dish.name }}?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No items in template. Add items above.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <a href="{% url 'meal_list' %}" class="btn btn-secondary">← Back to Meals</a>
+</div>
+{% endblock %}

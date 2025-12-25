@@ -1,0 +1,44 @@
+{% extends 'tiffin_app/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'daily_entry_add' %}" class="btn btn-primary btn-lg">+ Create Order</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Customers</div>
+            <div class="stat-value">{{ total_customers }}</div>
+        </div>
+        <div class="stat-card success">
+            <div class="stat-label">Total Dishes</div>
+            <div class="stat-value">{{ total_dishes }}</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-label">Total Meals</div>
+            <div class="stat-value">{{ total_meals }}</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="stat-label">Today's Orders</div>
+            <div class="stat-value">{{ today_orders }}</div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Quick Actions</h2>
+        </div>
+        <div class="card-body">
+            <div class="flex gap-2">
+                <a href="{% url 'daily_entry_add' %}" class="btn btn-primary btn-lg">+ Create Order</a>
+                <a href="{% url 'print_stickers' %}" class="btn btn-secondary">Print Stickers</a>
+                <a href="{% url 'customer_add' %}" class="btn btn-secondary">+ Add Customer</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

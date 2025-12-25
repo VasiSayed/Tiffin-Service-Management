@@ -1,0 +1,345 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Print Stickers{% endblock %}
+{% block page_title %}🏷️ Print Delivery Stickers{% endblock %}
+
+{% block top_actions %}
+<button onclick="window.print()" class="btn btn-primary no-print">🖨️ Print All</button>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <!-- Filter Card -->
+    <div class="card no-print sticker-filter-card">
+        <div class="card-header">
+            <h3 class="card-title">📅 Select Date & Meal</h3>
+        </div>
+        <div class="card-body">
+            <form method="get" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+                <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                    <label class="form-label">📆 Date</label>
+                    <input type="date" name="date" class="form-control form-control-lg" value="{{ entry_date }}" required>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 150px; margin-bottom: 0;">
+                    <label class="form-label">🍱 Meal Type</label>
+                    <select name="meal_type" class="form-control form-control-lg">
+                        <option value="LUNCH" {% if meal_type == 'LUNCH' %}selected{% endif %}>🌞 Lunch</option>
+                        <option value="DINNER" {% if meal_type == 'DINNER' %}selected{% endif %}>🌙 Dinner</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 0 0 120px; margin-bottom: 0;">
+                    <label class="form-label">Per Page</label>
+                    <select name="per_page" class="form-control">
+                        <option value="6" {% if per_page == 6 %}selected{% endif %}>6</option>
+                        <option value="8" {% if per_page == 8 %}selected{% endif %}>8</option>
+                        <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    </select>
+                </div>
+                <div style="flex: 0 0 auto;">
+                    <button type="submit" class="btn btn-primary btn-lg">🔍 Generate</button>
+                </div>
+            </form>
+            
+            {% if sticker_data %}
+            <div class="sticker-summary no-print" style="margin-top: 20px; padding: 15px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div>
+                        <strong>📦 Total Orders:</strong> {{ sticker_data|length }}
+                    </div>
+                    <div>
+                        <strong>📅 Date:</strong> {{ entry_date }}
+                    </div>
+                    <div>
+                        <strong>🍱 Type:</strong> {{ meal_type }}
+                    </div>
+                    <div>
+                        <strong>💰 Total Revenue:</strong> ₹{{ sticker_data|sum_total }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Stickers Grid -->
+    <div class="stickers-grid-modern">
+        {% for data in sticker_data %}
+        <div class="sticker-modern {% if meal_type == 'LUNCH' %}lunch{% else %}dinner{% endif %}">
+            <!-- Header with color -->
+            <div class="sticker-header-modern">
+                <div class="sticker-customer-modern">{{ data.entry.customer.name|upper }}</div>
+                <div class="sticker-location-modern">📍 {{ data.entry.customer.delivery_location }}</div>
+            </div>
+            
+            <!-- Body with white background -->
+            <div class="sticker-body-modern">
+                <!-- Meta info -->
+                <div class="sticker-meta-modern">
+                    <span class="meta-badge">
+                        {% if meal_type == 'LUNCH' %}🌞{% else %}🌙{% endif %} {{ meal_type }}
+                    </span>
+                    <span class="meta-date">{{ entry_date }}</span>
+                </div>
+                
+                <!-- Items list (if show_bhaji enabled) -->
+                {% if data.entry.meal and data.entry.meal.show_bhaji_on_sticker and data.bhaji_items %}
+                <div class="sticker-items-modern">
+                    <div class="items-header">📋 Items:</div>
+                    {% for item in data.bhaji_items %}
+                    <div class="sticker-item-modern">
+                        <span class="item-name">{{ item.dish_name }}</span>
+                        <span class="item-qty">×{{ item.qty }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <!-- Total amount -->
+                <div class="sticker-total-modern">
+                    <span class="total-label">TOTAL</span>
+                    <span class="total-amount">₹{{ data.entry.total_amount }}</span>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <!-- Empty state -->
+        <div class="empty-state-stickers no-print" style="grid-column: 1/-1;">
+            <div class="empty-icon">📦</div>
+            <div class="empty-title">No orders found</div>
+            <div class="empty-text">
+                No {{ meal_type|lower }} orders for {{ entry_date }}<br>
+                Try selecting a different date or meal type.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+/* Modern Sticker Styles */
+.sticker-filter-card {
+    border: 2px solid #e5e7eb;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+}
+
+.stickers-grid-modern {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 25px;
+    margin-top: 30px;
+}
+
+.sticker-modern {
+    background: white;
+    border: 3px solid #1f2937;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    page-break-inside: avoid;
+    transition: transform 0.2s;
+}
+
+.sticker-modern:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.sticker-header-modern {
+    padding: 20px;
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    color: white;
+    border-bottom: 3px solid #1f2937;
+}
+
+.sticker-modern.lunch .sticker-header-modern {
+    background: linear-gradient(135deg, var(--lunch-sticker, #ef4444) 0%, #dc2626 100%) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.sticker-modern.dinner .sticker-header-modern {
+    background: linear-gradient(135deg, var(--dinner-sticker, #1f2937) 0%, #111827 100%) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.sticker-customer-modern {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.sticker-location-modern {
+    font-size: 1.05rem;
+    opacity: 0.95;
+    font-weight: 500;
+}
+
+.sticker-body-modern {
+    padding: 20px;
+    background: white;
+}
+
+.sticker-meta-modern {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px dashed #e5e7eb;
+}
+
+.meta-badge {
+    background: #eff6ff;
+    color: #1e40af;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.meta-date {
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.sticker-items-modern {
+    margin: 16px 0;
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+}
+
+.items-header {
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sticker-item-modern {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 1.05rem;
+}
+
+.sticker-item-modern:last-child {
+    border-bottom: none;
+}
+
+.item-name {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.item-qty {
+    font-weight: 700;
+    color: #3b82f6;
+}
+
+.sticker-total-modern {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 3px double #1f2937;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.total-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #6b7280;
+    letter-spacing: 1px;
+}
+
+.total-amount {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1f2937;
+    letter-spacing: 0.5px;
+}
+
+/* Empty State */
+.empty-state-stickers {
+    text-align: center;
+    padding: 80px 20px;
+    background: white;
+    border-radius: 12px;
+    border: 2px dashed #d1d5db;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.4;
+}
+
+.empty-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 10px;
+}
+
+.empty-text {
+    font-size: 1rem;
+    color: #6b7280;
+    line-height: 1.6;
+}
+
+/* Print Styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        background: white !important;
+    }
+    
+    .main-content {
+        padding: 0 !important;
+    }
+    
+    .stickers-grid-modern {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 15px !important;
+        margin-top: 0 !important;
+    }
+    
+    .sticker-modern {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 15px;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+    
+    .sticker-modern:hover {
+        transform: none !important;
+    }
+    
+    .sticker-modern.lunch .sticker-header-modern {
+        background: var(--lunch-sticker) !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+    
+    .sticker-modern.dinner .sticker-header-modern {
+        background: var(--dinner-sticker) !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,541 @@
+{# tiffin_app/templates/tiffin_app/expenses/dashboard.html #}
+{% extends 'tiffin_app/base.html' %}
+
+{% block title %}Daily Expenses{% endblock %}
+{% block page_title %}💰 Daily Expense Tracker{% endblock %}
+{% block top_actions %}
+  <a href="{% url 'expense_report' %}" class="btn btn-accent">Monthly Report</a>
+
+  <a href="{% url 'expense_category_list' %}" class="btn btn-secondary">Categories</a>
+  <a href="{% url 'expense_item_list' %}" class="btn btn-secondary">Items</a>
+{% endblock %}
+
+
+{% block content %}
+<div class="main-content">
+
+  {# CSRF token for JS fetch (safe to keep inside any form) #}
+  <form style="display:none;">{% csrf_token %}</form>
+
+  <!-- Date Selector & Month Total -->
+  <div class="card">
+    <div class="card-body">
+      <div style="display:flex; gap:20px; align-items:flex-end; flex-wrap:wrap;">
+        <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0;">
+          <label class="form-label">Select Date</label>
+          <input type="date" id="expenseDate" class="form-control" value="{{ selected_date }}" />
+        </div>
+
+        <div style="flex:2; background:#f0fdf4; padding:15px; border-radius:8px; border-left:4px solid #22c55e;">
+          <div style="font-size:0.85rem; color:#15803d; font-weight:600; margin-bottom:4px;">
+            THIS MONTH TOTAL
+          </div>
+          <div style="font-size:1.8rem; font-weight:700; color:#166534;">
+            ₹{{ this_month_total }}
+          </div>
+        </div>
+
+        <div>
+          <button class="btn btn-primary" type="button" onclick="loadExpenseDate()">Load</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BULK ENTRY (Unlimited rows + single POST) -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Add Expenses</h3>
+    </div>
+    <div class="card-body">
+
+      {% if not categories %}
+        <div class="alert alert-error">
+          No Expense Categories found. Please create categories first.
+        </div>
+      {% endif %}
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:end; margin-bottom:12px;">
+        
+        <div class="form-group" style="min-width:240px; margin-bottom:0;">
+          <label class="form-label">Default Category</label>
+          <select id="defaultCategory" class="form-control">
+            <option value="">-- none --</option>
+            {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.name }}</option>
+            {% endfor %}
+          </select>
+          <!-- <div style="font-size:0.8rem; opacity:0.7; margin-top:4px;">
+            New rows will auto-pick this category.
+          </div> -->
+        </div>
+
+        <div class="form-group" style="min-width:260px; margin-bottom:0;">
+          <label class="form-label">Quick Notes</label>
+          <input id="bulkNotes" class="form-control" placeholder="e.g., Sabzi Mandi / Gas refill" />
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-success" type="button" onclick="addRow()">+ Add Row</button>
+          <button class="btn btn-secondary" type="button" onclick="addRow(true)">+ Add 5 Rows</button>
+          <button class="btn btn-danger" type="button" onclick="clearRows()">Clear</button>
+          <button class="btn btn-primary" type="button" id="saveBtn" onclick="saveAll()">💾 Save All</button>
+        </div>
+      </div>
+
+      <!-- Preview totals -->
+      <div class="card" style="margin: 0 0 12px 0; background:#f9fafb;">
+        <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <div style="font-size:0.85rem; opacity:0.7; font-weight:600;">Rows Ready</div>
+            <div style="font-size:1.2rem; font-weight:700;" id="rowsCount">0</div>
+          </div>
+          <div>
+            <div style="font-size:0.85rem; opacity:0.7; font-weight:600;">Grand Total (Preview)</div>
+            <div style="font-size:1.5rem; font-weight:800;" id="grandTotal">₹0.00</div>
+          </div>
+          <div id="saveStatus" style="font-size:0.95rem; font-weight:600; opacity:0.8;"></div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="table" id="expenseTable">
+          <thead>
+            <tr>
+              <th style="width:220px;">Category</th>
+              <th style="width:200px;" >Item</th>
+              <th style="width:120px;">Qty</th>
+              <th style="width:120px;">Unit</th>
+              <th style="width:140px;">Rate</th>
+              <th style="width:160px;">Line Total</th>
+              <th style="width:220px;">Notes</th>
+              <th style="width:80px;"></th>
+            </tr>
+          </thead>
+          <tbody id="rowsBody"></tbody>
+        </table>
+      </div>
+
+      <div style="font-size:0.85rem; opacity:0.75; margin-top:10px;">
+        Tips: Press <b>Enter</b> in the last field to add a new row. Line totals auto-calc.
+      </div>
+    </div>
+  </div>
+
+  <!-- EXISTING EXPENSES (Grouped by Category) -->
+  {% for g in grouped_expenses %}
+    <div class="card">
+      <div class="card-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0; font-size:1.2rem;">
+            {{ g.category.icon }} {{ g.category.name }}
+          </h3>
+          <div style="font-size:1.4rem; font-weight:800;">
+            ₹{{ g.total }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="table-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Quantity</th>
+                <th>Rate</th>
+                <th>Total</th>
+                <th style="width:120px;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in g.rows %}
+                <tr>
+                  <td><strong>{{ r.item.name }}</strong></td>
+                  <td>{{ r.quantity }} {{ r.unit }}</td>
+                  <td>₹{{ r.rate }}</td>
+                  <td><strong>₹{{ r.total }}</strong></td>
+                  <td>
+                    <form method="post" action="{% url 'expense_delete_item' r.id %}" style="display:inline;" onsubmit="return confirm('Delete {{ r.item.name }}?')">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-center text-muted">No rows.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="empty-state">
+      <!-- <div class="empty-state-icon">💰</div> -->
+      <div class="empty-state-text">No expenses for {{ selected_date }}</div>
+      <div class="empty-state-hint">Add rows above and click “Save All”.</div>
+    </div>
+  {% endfor %}
+
+</div>
+
+<script>
+/* ---------------- Dropdown API helpers ---------------- */
+async function fetchItems(categoryId) {
+  const res = await fetch("{% url 'expense_items_api' %}?category_id=" + encodeURIComponent(categoryId));
+  const data = await res.json();
+  return (data && data.items) ? data.items : [];
+}
+
+function makeItemOptions(items) {
+  let html = `<option value="">Select Item</option>`;
+  for (const it of items) {
+    html += `<option value="${it.id}" data-unit="${it.default_unit}">${it.name}</option>`;
+  }
+  return html;
+}
+
+async function loadItemsForRow(tr, categoryId) {
+  const itemSel = tr.querySelector(".js-item");
+  itemSel.innerHTML = `<option value="">Loading...</option>`;
+
+  if (!categoryId) {
+    itemSel.innerHTML = `<option value="">Select Item</option>`;
+    return;
+  }
+
+  const items = await fetchItems(categoryId);
+  itemSel.innerHTML = makeItemOptions(items);
+}
+
+/* ---------------- Row Creator (UPDATED) ---------------- */
+function addRow(addFive=false) {
+  const n = addFive ? 5 : 1;
+  for (let i=0; i<n; i++) {
+    const tbody = document.getElementById("rowsBody");
+    const tr = document.createElement("tr");
+
+    const defaultCat = document.getElementById("defaultCategory")?.value || "";
+
+    tr.innerHTML = `
+      <td>
+        <select class="form-control js-cat" required>
+          <option value="">Select</option>
+          {% for cat in categories %}
+            <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </td>
+
+      <td>
+        <select class="form-control js-item" required>
+          <option value="">Select Item</option>
+        </select>
+      </td>
+
+      <td><input class="form-control js-qty" type="number" step="0.01" placeholder="1" required /></td>
+
+      <td>
+        <select class="form-control js-unit">
+          <option value="KG">KG</option>
+          <option value="GM">Gram</option>
+          <option value="LTR">Litre</option>
+          <option value="ML">ML</option>
+          <option value="MTR">Meter</option>
+          <option value="PC">Piece</option>
+          <option value="PKT">Packet</option>
+          <option value="BOX">Box</option>
+          <option value="DOZEN">Dozen</option>
+        </select>
+      </td>
+
+      <td><input class="form-control js-rate" type="number" step="0.01" placeholder="40" required /></td>
+
+      <td><div style="font-weight:800;" class="js-line-total">₹0.00</div></td>
+
+      <td><input class="form-control js-notes" placeholder="optional" /></td>
+
+      <td>
+        <button class="btn btn-sm btn-danger" type="button" onclick="removeRow(this)">X</button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+
+    const catSel = tr.querySelector(".js-cat");
+    const itemSel = tr.querySelector(".js-item");
+    const unitSel = tr.querySelector(".js-unit");
+
+    // default category applied => load item dropdown
+    if (defaultCat) {
+      catSel.value = defaultCat;
+      loadItemsForRow(tr, defaultCat);
+    }
+
+    // when category changes => reload items
+    catSel.addEventListener("change", () => {
+      loadItemsForRow(tr, catSel.value);
+    });
+
+    // when item changes => auto set unit using data-unit
+    itemSel.addEventListener("change", () => {
+      const opt = itemSel.options[itemSel.selectedIndex];
+      const unit = opt?.dataset?.unit;
+      if (unit) unitSel.value = unit;
+    });
+
+    // calc total
+    const qty = tr.querySelector(".js-qty");
+    const rate = tr.querySelector(".js-rate");
+    [qty, rate].forEach(el => el.addEventListener("input", () => recalcRow(tr)));
+
+    recalcRow(tr);
+  }
+
+  refreshPreview();
+}
+</script>
+
+
+<script>
+/* -------------------- CSRF -------------------- */
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+function getCSRFToken() {
+  return getCookie("csrftoken") || (document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || "");
+}
+
+/* -------------------- Date -------------------- */
+function loadExpenseDate() {
+  const d = document.getElementById("expenseDate").value;
+  window.location.href = "{% url 'expense_dashboard' %}?date=" + encodeURIComponent(d);
+}
+
+/* ---------------- Dropdown API helpers ---------------- */
+async function fetchItems(categoryId) {
+  const res = await fetch("{% url 'expense_items_api' %}?category_id=" + encodeURIComponent(categoryId));
+  const data = await res.json();
+  return (data && data.items) ? data.items : [];
+}
+
+function makeItemOptions(items) {
+  let html = `<option value="">Select Item</option>`;
+  for (const it of items) {
+    html += `<option value="${it.id}" data-unit="${it.default_unit}">${it.name}</option>`;
+  }
+  return html;
+}
+
+async function loadItemsForRow(tr, categoryId) {
+  const itemSel = tr.querySelector(".js-item");
+  itemSel.innerHTML = `<option value="">Loading...</option>`;
+
+  if (!categoryId) {
+    itemSel.innerHTML = `<option value="">Select Item</option>`;
+    return;
+  }
+
+  const items = await fetchItems(categoryId);
+  itemSel.innerHTML = makeItemOptions(items);
+}
+
+/* -------------------- Money/Calc -------------------- */
+function toNum(v) {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
+function money(n) {
+  return "₹" + (Number(n || 0)).toFixed(2);
+}
+
+function recalcRow(tr) {
+  const qty = toNum(tr.querySelector(".js-qty").value);
+  const rate = toNum(tr.querySelector(".js-rate").value);
+  const total = qty * rate;
+  tr.querySelector(".js-line-total").textContent = money(total);
+  refreshPreview();
+}
+
+function removeRow(btn) {
+  btn.closest("tr")?.remove();
+  refreshPreview();
+}
+
+function clearRows() {
+  if (!confirm("Clear all draft rows?")) return;
+  document.getElementById("rowsBody").innerHTML = "";
+  refreshPreview();
+}
+
+/* -------------------- Create Row (DROPDOWN) -------------------- */
+function addRow(addFive=false) {
+  const n = addFive ? 5 : 1;
+
+  for (let i=0; i<n; i++) {
+    const tbody = document.getElementById("rowsBody");
+    const tr = document.createElement("tr");
+    const defaultCat = document.getElementById("defaultCategory")?.value || "";
+
+    tr.innerHTML = `
+      <td>
+        <select class="form-control js-cat" required>
+          <option value="">Select</option>
+          {% for cat in categories %}
+            <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </td>
+
+      <td>
+        <select class="form-control js-item" required>
+          <option value="">Select Item</option>
+        </select>
+      </td>
+
+      <td><input class="form-control js-qty" type="number" step="0.01" placeholder="1" required /></td>
+
+      <td>
+        <select class="form-control js-unit">
+          <option value="KG">KG</option>
+          <option value="GM">Gram</option>
+          <option value="LTR">Litre</option>
+          <option value="ML">ML</option>
+          <option value="MTR">Meter</option>
+          <option value="PC">Piece</option>
+          <option value="PKT">Packet</option>
+          <option value="BOX">Box</option>
+          <option value="DOZEN">Dozen</option>
+        </select>
+      </td>
+
+      <td><input class="form-control js-rate" type="number" step="0.01" placeholder="40" required /></td>
+
+      <td><div style="font-weight:800;" class="js-line-total">₹0.00</div></td>
+
+      <td><input class="form-control js-notes" placeholder="optional" /></td>
+
+      <td>
+        <button class="btn btn-sm btn-danger" type="button" onclick="removeRow(this)">X</button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+
+    const catSel = tr.querySelector(".js-cat");
+    const itemSel = tr.querySelector(".js-item");
+    const unitSel = tr.querySelector(".js-unit");
+
+    // default category
+    if (defaultCat) {
+      catSel.value = defaultCat;
+      loadItemsForRow(tr, defaultCat);
+    }
+
+    // category change -> reload items
+    catSel.addEventListener("change", () => loadItemsForRow(tr, catSel.value));
+
+    // item change -> auto unit
+    itemSel.addEventListener("change", () => {
+      const opt = itemSel.options[itemSel.selectedIndex];
+      const unit = opt?.dataset?.unit;
+      if (unit) unitSel.value = unit;
+    });
+
+    // calc
+    const qty = tr.querySelector(".js-qty");
+    const rate = tr.querySelector(".js-rate");
+    qty.addEventListener("input", () => recalcRow(tr));
+    rate.addEventListener("input", () => recalcRow(tr));
+
+    recalcRow(tr);
+  }
+
+  refreshPreview();
+}
+
+/* -------------------- Collect + Preview + Save -------------------- */
+function collectRows() {
+  const trs = Array.from(document.querySelectorAll("#rowsBody tr"));
+  const bulkNotes = (document.getElementById("bulkNotes")?.value || "").trim();
+
+  const rows = trs.map(tr => {
+    const category_id = tr.querySelector(".js-cat").value;
+    const item_id = tr.querySelector(".js-item").value;
+    const quantity = tr.querySelector(".js-qty").value;
+    const unit = tr.querySelector(".js-unit").value;
+    const rate = tr.querySelector(".js-rate").value;
+    const notesRow = (tr.querySelector(".js-notes").value || "").trim();
+    const notes = [notesRow, bulkNotes].filter(Boolean).join(" | ");
+
+    return { category_id, item_id, quantity, unit, rate, notes };
+  });
+
+  return rows.filter(r => r.category_id && r.item_id && r.quantity && r.rate);
+}
+
+function refreshPreview() {
+  const rows = collectRows();
+  document.getElementById("rowsCount").textContent = rows.length;
+
+  let grand = 0;
+  for (const r of rows) {
+    grand += toNum(r.quantity) * toNum(r.rate);
+  }
+  document.getElementById("grandTotal").textContent = money(grand);
+}
+
+async function saveAll() {
+  const date = document.getElementById("expenseDate").value;
+  if (!date) return alert("Select date");
+
+  const rows = collectRows();
+  if (!rows.length) return alert("Add at least 1 valid row");
+
+  const btn = document.getElementById("saveBtn");
+  const status = document.getElementById("saveStatus");
+  btn.disabled = true;
+  status.textContent = "Saving...";
+
+  try {
+    const res = await fetch("{% url 'expense_create' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCSRFToken(),
+      },
+      body: JSON.stringify({ date, rows }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      const err = data.error || ("Save failed (HTTP " + res.status + ")");
+      status.textContent = err;
+      alert(err);
+      return;
+    }
+
+    status.textContent = "Saved ✔";
+    window.location.href = "{% url 'expense_dashboard' %}?date=" + encodeURIComponent(date);
+
+  } catch (e) {
+    status.textContent = "Network error";
+    alert("Network error while saving");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* -------------------- Init -------------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  // add 2 rows by default
+  addRow(true);
+});
+</script>
+
+
+{% endblock %}

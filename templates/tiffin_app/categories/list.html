@@ -1,0 +1,33 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}Expense Categories{% endblock %}
+{% block page_title %}Expense Categories{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-primary" href="{% url 'expense_category_create' %}">+ Add Category</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <table class="table">
+      <thead>
+        <tr><th>Name</th><th>Active</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for c in categories %}
+        <tr>
+          <td>{{ c.icon }} <strong>{{ c.name }}</strong></td>
+          <td>{% if c.is_active %}<span class="badge badge-success">Yes</span>{% else %}<span class="badge badge-danger">No</span>{% endif %}</td>
+          <td>
+            <a class="btn btn-sm btn-success" href="{% url 'expense_category_edit' c.id %}">Edit</a>
+            <a class="btn btn-sm btn-danger" href="{% url 'expense_category_delete' c.id %}">Delete</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-center text-muted">No categories yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

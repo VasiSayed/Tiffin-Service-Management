@@ -1,0 +1,56 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}{{ title|default:"Category Form" }}{% endblock %}
+{% block page_title %}{{ title|default:"Category" }}{% endblock %}
+
+{% block top_actions %}
+  <a class="btn btn-secondary" href="{% url 'expense_category_list' %}">← Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+
+  <div class="card">
+    <div class="card-body">
+
+      {% if form.errors %}
+        <div class="alert alert-error">
+          Please fix the errors below.
+        </div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="form-group">
+          <label class="form-label">Category Name *</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="text-danger">{{ form.name.errors }}</div>{% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Icon</label>
+          {{ form.icon }}
+          <div style="font-size:0.85rem; opacity:0.7; margin-top:4px;">
+            Example: 🥬 🛒 🔥 ⛽ 📦 🧾
+          </div>
+          {% if form.icon.errors %}<div class="text-danger">{{ form.icon.errors }}</div>{% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            {{ form.is_active }} Active
+          </label>
+          {% if form.is_active.errors %}<div class="text-danger">{{ form.is_active.errors }}</div>{% endif %}
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="{% url 'expense_category_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

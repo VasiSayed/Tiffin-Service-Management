@@ -1,0 +1,31 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}Delete Category{% endblock %}
+{% block page_title %}🗑 Delete Category{% endblock %}
+
+{% block top_actions %}
+  <a class="btn btn-secondary" href="{% url 'expense_category_list' %}">← Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+
+  <div class="card">
+    <div class="card-body">
+      <div class="alert alert-error">
+        Are you sure you want to delete <strong>{{ category.icon }} {{ category.name }}</strong>?
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Yes, Delete</button>
+        <a href="{% url 'expense_category_list' %}" class="btn btn-secondary">Cancel</a>
+      </form>
+
+      <div style="margin-top:10px; font-size:0.85rem; opacity:0.75;">
+        Note: If this category is used by items, deletion may fail depending on FK rules.
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

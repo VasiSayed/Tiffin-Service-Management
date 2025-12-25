@@ -1,0 +1,42 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Meals{% endblock %}
+{% block page_title %}Meals{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'meal_add' %}" class="btn btn-primary">+ Add Meal</a>
+{% endblock %}
+{% block content %}
+<div class="main-content">
+    
+        <div class="card">
+            <div class="card-body card-body-compact">
+                <table class="table">
+                    <thead>
+                        <tr><th>Meal Name</th><th>Type</th><th>Price</th><th>Show Bhaji</th><th>Active</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for meal in meals %}
+                        <tr>
+                            <td><strong>{{ meal.name }}</strong></td>
+                            <td><span class="badge badge-info">{{ meal.get_meal_type_display }}</span></td>
+                            <td>₹{{ meal.price }}</td>
+                            <td>{% if meal.show_bhaji_on_sticker %}Yes{% else %}No{% endif %}</td>
+                            <td>{% if meal.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge badge-danger">Inactive</span>{% endif %}</td>
+                            <td class="table-actions">
+                                <a href="{% url 'meal_detail' meal.pk %}" class="btn btn-sm btn-success">Items</a>
+                                <a href="{% url 'meal_edit' meal.pk %}" class="btn btn-sm btn-secondary">Edit</a>
+                                <form method="post" action="{% url 'meal_delete' meal.pk %}" style="display:inline;" onsubmit="return confirmDelete('Delete meal?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center">No meals found</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

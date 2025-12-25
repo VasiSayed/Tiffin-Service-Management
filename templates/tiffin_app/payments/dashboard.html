@@ -1,0 +1,110 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Payments{% endblock %}
+{% block page_title %}Payments{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'payment_add' %}" class="btn btn-primary">+ Add Payment</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+
+  <div class="card">
+    <div class="card-body" style="padding:12px 14px;">
+      <form method="get" class="filters" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <label class="form-label" style="margin:0; font-weight:700;">Month</label>
+
+        <input
+          id="monthInput"
+          type="month"
+          name="month"
+          class="form-control"
+          value="{{ month }}"
+          style="width:180px; height:38px; padding:6px 10px;"
+          onchange="this.form.submit()"
+        />
+
+        {# optional: show currently selected month text #}
+        {# <span style="opacity:.7; font-size:12px;">Showing: {{ month }}</span> #}
+      </form>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Raised</div>
+      <div class="stat-value">₹{{ total_raised }}</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-label">Received</div>
+      <div class="stat-value">₹{{ total_received }}</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-label">Outstanding</div>
+      <div class="stat-value">₹{{ outstanding }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Customer Payments</h2>
+    </div>
+    <div class="card-body card-body-compact">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Customer</th><th>Raised</th><th>Received</th><th>Balance</th><th>Last Payment</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for data in customer_data %}
+          <tr>
+            <td><strong>{{ data.customer.name }}</strong></td>
+            <td>₹{{ data.raised }}</td>
+            <td>₹{{ data.received }}</td>
+            <td class="{% if data.balance > 0 %}text-danger{% else %}text-success{% endif %}">
+              <strong>₹{{ data.balance }}</strong>
+            </td>
+            <td>{% if data.last_payment %}{{ data.last_payment.payment_date }}{% else %}-{% endif %}</td>
+            <td>
+              <a href="{% url 'payment_add' %}?customer={{ data.customer.pk }}" class="btn btn-sm btn-primary">
+                Add Payment
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center">No customer data found</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // ✅ Prevent future month selection for <input type="month">
+  document.addEventListener("DOMContentLoaded", function () {
+    const monthInput = document.getElementById("monthInput");
+    if (!monthInput) return;
+
+    const pad = (n) => String(n).padStart(2, "0");
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+
+    // Block future month in picker
+    monthInput.setAttribute("max", thisMonth);
+
+    // Clamp if url/manual input had future month
+    const clamp = () => {
+      const v = monthInput.value;
+      if (v && v > thisMonth) monthInput.value = thisMonth;
+    };
+
+    monthInput.addEventListener("change", clamp);
+    clamp();
+  });
+</script>
+{% endblock %}

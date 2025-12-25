@@ -1,0 +1,575 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Tiffin Service Management{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'tiffin_app/css/style.css' %}">
+    <style>
+        :root {
+            --primary: {{ theme_primary }};
+            --primary-dark: {{ theme_primary }}dd;
+            --primary-light: {{ theme_primary }}33;
+            --secondary: {{ theme_secondary }};
+            --accent: {{ theme_secondary }};
+            --lunch-sticker: {{ lunch_sticker_color }};
+            --dinner-sticker: {{ dinner_sticker_color }};
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if user.is_authenticated %}
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                {% if tenant and tenant.logo %}
+                    <img src="{{ logo_url }}" alt="Logo" class="sidebar-logo">
+                {% endif %}
+                <h1 class="sidebar-title">{{ tenant_name }}</h1>
+            </div>
+            
+            <nav class="sidebar-nav">
+                {% if user.profile.role == 'ADMIN' %}
+                    <div class="nav-item">
+                        <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" title="Dashboard">
+                            <!-- <span class="nav-icon">📊</span> -->
+                            <span class="nav-text">Dashboard</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'customer_list' %}" class="nav-link {% if 'customer' in request.path %}active{% endif %}" title="Customers">
+                            <!-- <span class="nav-icon">👥</span> -->
+                            <span class="nav-text">Customers</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'dish_list' %}" class="nav-link {% if 'dish' in request.path %}active{% endif %}" title="Dishes">
+                            <!-- <span class="nav-icon">🍛</span> -->
+                            <span class="nav-text">Dishes</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'meal_list' %}" class="nav-link {% if 'meal' in request.path %}active{% endif %}" title="Meals">
+                            <!-- <span class="nav-icon">🍱</span> -->
+                            <span class="nav-text">Meals</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}" title="Daily Entry">
+                            <!-- <span class="nav-icon">📝</span> -->
+                            <span class="nav-text">Daily Entry</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}" title="Print Stickers">
+                            <!-- <span class="nav-icon">🏷️</span> -->
+                            <span class="nav-text">Print Stickers</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'payments' %}" class="nav-link {% if 'payment' in request.path %}active{% endif %}" title="Payments">
+                            <!-- <span class="nav-icon">💰</span> -->
+                            <span class="nav-text">Payments</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+  <a href="{% url 'expense_dashboard' %}"
+     class="nav-link {% if 'expenses' in request.path %}active{% endif %}"
+     title="Expenses">
+    <span class="nav-text">Expenses</span>
+  </a>
+</div>
+
+                    <div class="nav-item">
+                        <a href="{% url 'reports' %}" class="nav-link {% if 'report' in request.path %}active{% endif %}" title="Reports">
+                            <!-- <span class="nav-icon">📈</span> -->
+                            <span class="nav-text">Reports</span>
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="nav-item">
+                        <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}" title="Daily Entry">
+                            <!-- <span class="nav-icon">📝</span> -->
+                            <span class="nav-text">Daily Entry</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}" title="Print Stickers">
+                            <!-- <span class="nav-icon">🏷️</span> -->
+                            <span class="nav-text">Print Stickers</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'dish_list' %}" class="nav-link {% if 'dish' in request.path %}active{% endif %}" title="Dishes">
+                            <!-- <span class="nav-icon">🍛</span> -->
+                            <span class="nav-text">Dishes</span>
+                        </a>
+                    </div>
+                {% endif %}
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-info-sidebar">
+                    <div class="user-name-sidebar">{{ user.username }}</div>
+                    <div class="user-role-sidebar">{{ user.profile.get_role_display }}</div>
+                </div>
+                <a href="{% url 'logout' %}" class="btn btn-secondary w-full btn-sm" title="Logout">
+                    <span class="logout-icon">⎋</span>
+                    <span class="logout-text">Logout</span>
+                </a>
+            </div>
+        </aside>
+        
+        <!-- Toggle Button -->
+        <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle Menu">
+            <span id="toggle-icon">◀</span>
+        </button>
+        
+        <!-- Main Content Wrapper -->
+        <div class="main-wrapper" id="mainWrapper">
+            <div class="top-bar no-print">
+                <div class="top-bar-title">{% block page_title %}{% endblock %}</div>
+                <div class="top-bar-actions">
+                    {% block top_actions %}{% endblock %}
+                </div>
+            </div>
+            
+            {% include 'tiffin_app/partials/messages.html' %}
+            
+            {% block content %}{% endblock %}
+        </div>
+        
+        <!-- Mobile Menu Button -->
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()" style="display: none;">☰</button>
+    {% else %}
+        {% include 'tiffin_app/partials/messages.html' %}
+        {% block content_unauthenticated %}{% endblock %}
+    {% endif %}
+    
+    <script src="{% static 'tiffin_app/js/main.js' %}"></script>
+    <script>
+        function toggleMobileMenu() {
+            document.getElementById('sidebar').classList.toggle('mobile-open');
+        }
+        
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainWrapper = document.getElementById('mainWrapper');
+            const toggleIcon = document.getElementById('toggle-icon');
+            
+            sidebar.classList.toggle('collapsed');
+            mainWrapper.classList.toggle('sidebar-collapsed');
+            
+            // Change icon
+            if (sidebar.classList.contains('collapsed')) {
+                toggleIcon.textContent = '▶';
+                localStorage.setItem('sidebarCollapsed', 'true');
+            } else {
+                toggleIcon.textContent = '◀';
+                localStorage.setItem('sidebarCollapsed', 'false');
+            }
+        }
+        
+        // Remember sidebar state
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (sidebarCollapsed) {
+                const sidebar = document.getElementById('sidebar');
+                const mainWrapper = document.getElementById('mainWrapper');
+                const toggleIcon = document.getElementById('toggle-icon');
+                
+                sidebar.classList.add('collapsed');
+                mainWrapper.classList.add('sidebar-collapsed');
+                toggleIcon.textContent = '▶';
+            }
+        });
+    </script>
+    
+    {% if user.is_authenticated %}
+    <!-- AI Chatbot Widget with Tenant Colors -->
+    <div class="chatbot-widget" id="chatbot">
+        <button class="chatbot-toggle" onclick="toggleChatbot()">
+            <span class="chat-icon">💬</span>
+            <span class="chat-text">Help</span>
+        </button>
+        
+        <div class="chatbot-window" id="chatWindow" style="display: none;">
+            <div class="chatbot-header">
+                <h3>🤖 {{ tenant_name }} Assistant</h3>
+                <button onclick="toggleChatbot()" class="chat-close">×</button>
+            </div>
+            
+            <div class="chatbot-body" id="chatBody">
+                <div class="chat-message bot">
+                    <div class="message-bubble">
+                        Hi! मैं आपकी मदद कैसे कर सकता हूँ?<br><br>
+                        <strong>Quick Actions:</strong><br>
+                        • Create order<br>
+                        • Print stickers<br>
+                        • Add expense<br>
+                        • View reports
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chatbot-footer">
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="chatAction('order')">📝 Order</button>
+                    <button class="quick-btn" onclick="chatAction('sticker')">🏷️ Stickers</button>
+                    <button class="quick-btn" onclick="chatAction('expense')">💰 Expense</button>
+                    <button class="quick-btn" onclick="chatAction('report')">📊 Report</button>
+                </div>
+                <div class="chat-input-box">
+                    <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    .chatbot-widget {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+    }
+
+    .chatbot-toggle {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: var(--primary);
+        border: 2px solid rgba(255,255,255,0.3);
+        color: white;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+    }
+
+    .chatbot-toggle:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        background: var(--primary-dark);
+    }
+
+    .chat-icon { font-size: 1.5rem; }
+    .chat-text { font-size: 0.7rem; margin-top: 2px; font-weight: 600; }
+
+    .chatbot-window {
+        position: absolute;
+        bottom: 80px;
+        right: 0;
+        width: 350px;
+        height: 500px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 2px solid var(--primary);
+    }
+
+    .chatbot-header {
+        background: var(--primary);
+        color: white;
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .chatbot-header h3 { margin: 0; font-size: 1.1rem; }
+
+    .chat-close {
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s;
+    }
+
+    .chat-close:hover { background: rgba(255,255,255,0.3); }
+
+    .chatbot-body {
+        flex: 1;
+        padding: 15px;
+        overflow-y: auto;
+        background: #f5f6fa;
+    }
+
+    .chat-message {
+        margin-bottom: 15px;
+        display: flex;
+    }
+
+    .chat-message.bot { justify-content: flex-start; }
+    .chat-message.user { justify-content: flex-end; }
+
+    .message-bubble {
+        max-width: 70%;
+        padding: 10px 15px;
+        border-radius: 12px;
+        line-height: 1.4;
+        font-size: 0.9rem;
+    }
+
+    .chat-message.bot .message-bubble {
+        background: white;
+        color: #333;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .chat-message.user .message-bubble {
+        background: var(--primary);
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .chatbot-footer {
+        border-top: 1px solid #ddd;
+        background: white;
+    }
+
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .quick-btn {
+        padding: 8px 12px;
+        border: 1px solid var(--primary);
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        color: var(--primary);
+        font-weight: 500;
+    }
+
+    .quick-btn:hover {
+        background: var(--primary);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .chat-input-box {
+        display: flex;
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .chat-input-box input {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        outline: none;
+    }
+
+    .chat-input-box input:focus {
+        border-color: var(--primary);
+    }
+
+    .toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle input {
+  display: none;
+}
+.toggle .track {
+  width: 44px;
+  height: 24px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.2s ease;
+}
+.toggle .thumb {
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 999px;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: left 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+}
+.toggle input:checked + .track {
+  background: var(--primary, #1e40af);
+}
+.toggle input:checked + .track .thumb {
+  left: 22px;
+}
+.toggle .text {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+
+    .chat-input-box button {
+        padding: 8px 20px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .chat-input-box button:hover {
+        background: var(--primary-dark);
+    }
+
+    @media (max-width: 768px) {
+        .chatbot-window {
+            width: 300px;
+            height: 450px;
+            bottom: 70px;
+        }
+        
+        .chatbot-toggle {
+            bottom: 80px;
+        }
+    }
+    </style>
+
+    <script>
+    function toggleChatbot() {
+        const chatWindow = document.getElementById('chatWindow');
+        chatWindow.style.display = chatWindow.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function chatAction(action) {
+        const actions = {
+            'order': '/daily-entry',
+            'sticker': '/print-stickers',
+            'expense': '/expenses',
+            'report': showReportOptions
+        };
+        
+        if (typeof actions[action] === 'function') {
+            actions[action]();
+        } else {
+            addBotMessage('Opening ' + action + ' page...');
+            setTimeout(() => window.location.href = actions[action], 800);
+        }
+    }
+
+    function showReportOptions() {
+        addBotMessage(`
+            📊 Which report would you like?<br><br>
+            <button onclick="window.location.href='/reports'" class="quick-btn" style="display:block;margin:5px 0;width:100%;">📈 Sales Report</button>
+            <button onclick="window.location.href='/expenses/report'" class="quick-btn" style="display:block;margin:5px 0;width:100%;">💰 Expense Report</button>
+        `);
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const message = input.value.trim();
+        
+        if (!message) return;
+        
+        addUserMessage(message);
+        input.value = '';
+        
+        setTimeout(() => {
+            handleUserMessage(message.toLowerCase());
+        }, 500);
+    }
+
+    function addUserMessage(text) {
+        const chatBody = document.getElementById('chatBody');
+        chatBody.innerHTML += `
+            <div class="chat-message user">
+                <div class="message-bubble">${escapeHtml(text)}</div>
+            </div>
+        `;
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function addBotMessage(text) {
+        const chatBody = document.getElementById('chatBody');
+        chatBody.innerHTML += `
+            <div class="chat-message bot">
+                <div class="message-bubble">${text}</div>
+            </div>
+        `;
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function handleUserMessage(message) {
+        let response = '';
+        
+        if (message.includes('order') || message.includes('entry') || message.includes('create')) {
+            response = '📝 Opening daily entry page...';
+            setTimeout(() => window.location.href = '/daily-entry/', 1000);
+        } else if (message.includes('sticker') || message.includes('print')) {
+            response = '🏷️ Opening print stickers page...';
+            setTimeout(() => window.location.href = '/print-stickers/', 1000);
+        } else if (message.includes('expense') || message.includes('kharcha') || message.includes('खर्चा')) {
+            response = '💰 Opening expense tracker...';
+            setTimeout(() => window.location.href = '/expenses/', 1000);
+        } else if (message.includes('customer')) {
+            response = '👥 Opening customers page...';
+            setTimeout(() => window.location.href = '/customers/', 1000);
+        } else if (message.includes('report') || message.includes('रिपोर्ट')) {
+            showReportOptions();
+            return;
+        } else if (message.includes('help') || message.includes('मदद')) {
+            response = `मैं आपकी इन चीज़ों में मदद कर सकता हूँ:<br><br>
+                📝 <strong>Order create</strong> - "create order"<br>
+                🏷️ <strong>Stickers print</strong> - "print stickers"<br>
+                💰 <strong>Expense add</strong> - "add expense"<br>
+                👥 <strong>Customers</strong> - "show customers"<br>
+                📊 <strong>Reports</strong> - "show report"`;
+        } else {
+            response = `❓ Sorry, मैं समझ नहीं पाया।<br><br>
+                Try: "create order", "print stickers", "add expense", "help"`;
+        }
+        
+        addBotMessage(response);
+    }
+
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+    </script>
+    {% endif %}
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

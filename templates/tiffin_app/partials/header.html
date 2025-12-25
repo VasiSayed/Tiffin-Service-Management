@@ -1,0 +1,38 @@
+{% load static %}
+<header class="header">
+    <div class="container">
+        <div class="header-content">
+            <div class="header-brand">
+                {% if tenant and tenant.logo %}
+                    <img src="{{ logo_url }}" alt="Logo" class="header-logo">
+                {% endif %}
+                <h1 class="header-title">{{ tenant_name }}</h1>
+            </div>
+            
+            <nav class="header-nav">
+                {% if user.profile.role == 'ADMIN' %}
+                    <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
+                    <a href="{% url 'customer_list' %}" class="nav-link {% if 'customer' in request.path %}active{% endif %}">Customers</a>
+                    <a href="{% url 'dish_list' %}" class="nav-link {% if 'dish' in request.path %}active{% endif %}">Dishes</a>
+                    <a href="{% url 'meal_list' %}" class="nav-link {% if 'meal' in request.path %}active{% endif %}">Meals</a>
+                    <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}">Daily Entry</a>
+                    <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}">Print Stickers</a>
+                    <a href="{% url 'payments' %}" class="nav-link {% if 'payment' in request.path %}active{% endif %}">Payments</a>
+                    <a href="{% url 'reports' %}" class="nav-link {% if 'report' in request.path %}active{% endif %}">Reports</a>
+                {% else %}
+                    <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}">Daily Entry</a>
+                    <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}">Print Stickers</a>
+                    <a href="{% url 'dish_list' %}" class="nav-link {% if 'dish' in request.path %}active{% endif %}">Dishes</a>
+                {% endif %}
+                
+                <div class="header-user">
+                    <div class="user-info">
+                        <div class="user-name">{{ user.username }}</div>
+                        <div class="user-role">{{ user.profile.get_role_display }}</div>
+                    </div>
+                    <a href="{% url 'logout' %}" class="btn btn-secondary btn-sm">Logout</a>
+                </div>
+            </nav>
+        </div>
+    </div>
+</header>

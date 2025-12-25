@@ -1,0 +1,401 @@
+<!-- Add this to templates/tiffin_app/base.html before </body> -->
+
+<!-- AI Chatbot Widget -->
+<div class="chatbot-widget" id="chatbot">
+    <button class="chatbot-toggle" onclick="toggleChatbot()">
+        <span class="chat-icon">💬</span>
+        <span class="chat-text">Help</span>
+    </button>
+    
+    <div class="chatbot-window" id="chatWindow" style="display: none;">
+        <div class="chatbot-header">
+            <h3>🤖 Tiffin Assistant</h3>
+            <button onclick="toggleChatbot()" class="chat-close">×</button>
+        </div>
+        
+        <div class="chatbot-body" id="chatBody">
+            <div class="chat-message bot">
+                <div class="message-bubble">
+                    Hi! मैं आपकी मदद कैसे कर सकता हूँ?<br><br>
+                    <strong>Quick Actions:</strong><br>
+                    • Create today's order<br>
+                    • Print stickers<br>
+                    • Add expense<br>
+                    • Download report<br>
+                    • Send email report
+                </div>
+            </div>
+        </div>
+        
+        <div class="chatbot-footer">
+            <div class="quick-actions">
+                <button class="quick-btn" onclick="chatAction('order')">📝 Order</button>
+                <button class="quick-btn" onclick="chatAction('sticker')">🏷️ Stickers</button>
+                <button class="quick-btn" onclick="chatAction('expense')">💰 Expense</button>
+                <button class="quick-btn" onclick="chatAction('report')">📊 Report</button>
+            </div>
+            <div class="chat-input-box">
+                <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.chatbot-widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.chatbot-toggle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.chatbot-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+
+.chat-icon {
+    font-size: 1.5rem;
+}
+
+.chat-text {
+    font-size: 0.7rem;
+    margin-top: 2px;
+}
+
+.chatbot-window {
+    position: absolute;
+    bottom: 80px;
+    right: 0;
+    width: 350px;
+    height: 500px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chatbot-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chatbot-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.chat-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.chat-close:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.chatbot-body {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background: #f5f6fa;
+}
+
+.chat-message {
+    margin-bottom: 15px;
+    display: flex;
+}
+
+.chat-message.bot {
+    justify-content: flex-start;
+}
+
+.chat-message.user {
+    justify-content: flex-end;
+}
+
+.message-bubble {
+    max-width: 70%;
+    padding: 10px 15px;
+    border-radius: 12px;
+    line-height: 1.4;
+}
+
+.chat-message.bot .message-bubble {
+    background: white;
+    color: #333;
+    border-bottom-left-radius: 4px;
+}
+
+.chat-message.user .message-bubble {
+    background: #667eea;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.chatbot-footer {
+    border-top: 1px solid #ddd;
+    background: white;
+}
+
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.quick-btn {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.quick-btn:hover {
+    background: #f0f0f0;
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.chat-input-box {
+    display: flex;
+    padding: 10px;
+    gap: 8px;
+}
+
+.chat-input-box input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    outline: none;
+}
+
+.chat-input-box button {
+    padding: 8px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .chatbot-window {
+        width: 300px;
+        height: 450px;
+    }
+}
+</style>
+
+<script>
+function toggleChatbot() {
+    const chatWindow = document.getElementById('chatWindow');
+    chatWindow.style.display = chatWindow.style.display === 'none' ? 'block' : 'none';
+}
+
+function chatAction(action) {
+    const actions = {
+        'order': '/daily-entry/create/',
+        'sticker': '/print-stickers/',
+        'expense': '/expenses/',
+        'report': showReportOptions
+    };
+    
+    if (typeof actions[action] === 'function') {
+        actions[action]();
+    } else {
+        window.location.href = actions[action];
+    }
+}
+
+function showReportOptions() {
+    addBotMessage(`
+        📊 Which report would you like?<br><br>
+        <button onclick="downloadReport('sales')" class="quick-btn">Sales Report</button>
+        <button onclick="downloadReport('expense')" class="quick-btn">Expense Report</button>
+        <button onclick="emailReport()" class="quick-btn">📧 Email Report</button>
+    `);
+}
+
+function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    addUserMessage(message);
+    input.value = '';
+    
+    // Simple keyword matching
+    setTimeout(() => {
+        handleUserMessage(message.toLowerCase());
+    }, 500);
+}
+
+function addUserMessage(text) {
+    const chatBody = document.getElementById('chatBody');
+    chatBody.innerHTML += `
+        <div class="chat-message user">
+            <div class="message-bubble">${text}</div>
+        </div>
+    `;
+    chatBody.scrollTop = chatBody.scrollHeight;
+}
+
+function addBotMessage(text) {
+    const chatBody = document.getElementById('chatBody');
+    chatBody.innerHTML += `
+        <div class="chat-message bot">
+            <div class="message-bubble">${text}</div>
+        </div>
+    `;
+    chatBody.scrollTop = chatBody.scrollHeight;
+}
+
+function handleUserMessage(message) {
+    let response = '';
+    
+    if (message.includes('order') || message.includes('entry')) {
+        response = 'Opening daily entry page...';
+        setTimeout(() => window.location.href = '/daily-entry/create/', 1000);
+    } else if (message.includes('sticker') || message.includes('print')) {
+        response = 'Opening print stickers page...';
+        setTimeout(() => window.location.href = '/print-stickers/', 1000);
+    } else if (message.includes('expense') || message.includes('kharcha')) {
+        response = 'Opening expense tracker...';
+        setTimeout(() => window.location.href = '/expenses/', 1000);
+    } else if (message.includes('report') || message.includes('download')) {
+        response = 'Which report would you like to download?';
+        setTimeout(showReportOptions, 500);
+        return;
+    } else if (message.includes('customer') || message.includes('add')) {
+        response = 'Opening customers page...';
+        setTimeout(() => window.location.href = '/customers/', 1000);
+    } else if (message.includes('help')) {
+        response = `
+            मैं आपकी इन चीज़ों में मदद कर सकता हूँ:<br><br>
+            • Daily orders create करना<br>
+            • Stickers print करना<br>
+            • Expenses track करना<br>
+            • Reports download करना<br>
+            • Customers manage करना
+        `;
+    } else {
+        response = `
+            Sorry, मैं समझ नहीं पाया। Quick actions try करें:<br><br>
+            • "create order"<br>
+            • "print stickers"<br>
+            • "add expense"<br>
+            • "download report"
+        `;
+    }
+    
+    addBotMessage(response);
+}
+
+function downloadReport(type) {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    
+    if (type === 'sales') {
+        window.location.href = `/reports/?year=${year}&month=${month}&download=csv`;
+    } else if (type === 'expense') {
+        window.location.href = `/expenses/download/?year=${year}&month=${month}`;
+    }
+    
+    addBotMessage('Downloading report... ✅');
+}
+
+function emailReport() {
+    addBotMessage('Enter your email address:');
+    const chatBody = document.getElementById('chatBody');
+    chatBody.innerHTML += `
+        <div class="chat-message bot">
+            <div class="message-bubble">
+                <input type="email" id="emailInput" placeholder="your@email.com" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
+                <button onclick="sendEmailReport()" style="margin-top:8px;padding:8px 16px;background:#667eea;color:white;border:none;border-radius:4px;cursor:pointer;">Send Report</button>
+            </div>
+        </div>
+    `;
+}
+
+function sendEmailReport() {
+    const email = document.getElementById('emailInput').value;
+    if (!email) {
+        addBotMessage('Please enter a valid email address.');
+        return;
+    }
+    
+    // Send AJAX request to backend
+    fetch('/api/email-report/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ email: email })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addBotMessage(`✅ Report sent to ${email}!`);
+        } else {
+            addBotMessage('❌ Failed to send email. Please try again.');
+        }
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>

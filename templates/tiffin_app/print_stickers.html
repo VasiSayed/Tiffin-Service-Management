@@ -1,0 +1,272 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Print Stickers{% endblock %}
+{% block page_title %}Print Stickers{% endblock %}
+
+{% block top_actions %}
+<button onclick="printStickers()" class="btn btn-primary">🖨️ Print</button>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ---------------- Print rules ---------------- */
+  .no-print { }
+  @media print {
+    .no-print { display: none !important; }
+    .print-page { page-break-after: always; }
+    .print-page:last-child { page-break-after: auto; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  /* ---------------- Layout ---------------- */
+  .stickers-grid{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  /* Optional: if you want height tuning by per_page on print */
+  @media print {
+    .per-6 .sticker  { min-height: 85mm; }
+    .per-8 .sticker  { min-height: 65mm; }
+    .per-10 .sticker { min-height: 52mm; }
+  }
+
+  /* ---------------- Sticker (clean) ---------------- */
+  .sticker{
+    background:#fff !important;
+    color:#111827 !important;
+    border:1px solid #e5e7eb !important;
+    border-radius: 14px;
+    padding: 12px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    box-shadow: 0 8px 18px rgba(0,0,0,.10);
+  }
+
+  /* ✅ Only header colored */
+  .sticker-header{
+    background: var(--primary) !important;
+    color:#fff !important;
+    padding: 12px 14px;
+    border-radius: 12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap: 12px;
+  }
+
+  .sticker-customer{
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: .3px;
+    color:#fff !important;
+    text-transform: uppercase;
+  }
+
+  .sticker-location{
+    font-size: 13px;
+    opacity: .9;
+    color:#fff !important;
+    text-align:right;
+    white-space: nowrap;
+  }
+
+  .sticker-body{
+    margin-top: 10px;
+  }
+
+  .sticker-meta{
+    display:flex;
+    justify-content:space-between;
+    font-size: 12px;
+    color:#374151 !important;
+    padding: 8px 0;
+    border-bottom: 1px dashed #d1d5db;
+    margin-bottom: 8px;
+  }
+
+  .meal-title{
+    font-weight: 800;
+    font-size: 14px;
+    margin: 8px 0 6px;
+  }
+
+  .sticker-items{
+    display:flex;
+    flex-direction:column;
+    gap: 8px;
+  }
+
+  .sticker-item{
+    display:flex;
+    justify-content:space-between;
+    gap: 10px;
+    font-size: 13px;
+    color:#111827 !important;
+  }
+
+  .sticker-item .src{
+    font-size: 12px;
+    color:#6b7280 !important;
+    text-transform: uppercase;
+  }
+
+  .sticker-total{
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e5e7eb;
+    display:flex;
+    justify-content:flex-end;
+    gap: 10px;
+    font-weight: 900;
+    font-size: 18px;
+    color:#111827 !important;
+  }
+
+  .sticker-total .label{
+    font-weight: 800;
+    font-size: 14px;
+    opacity: .9;
+    align-self: flex-end;
+  }
+
+  /* optional hooks */
+  .sticker.lunch { }
+  .sticker.dinner { }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+  <div class="card no-print">
+    <div class="card-body">
+      <form id="stickerFilters" method="get" class="filters" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Date</label>
+          <input id="dateInput" type="date" name="date" class="form-control" value="{{ entry_date }}" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Meal Type</label>
+          <select name="meal_type" class="form-control">
+            <option value="LUNCH" {% if meal_type == 'LUNCH' %}selected{% endif %}>Lunch</option>
+            <option value="DINNER" {% if meal_type == 'DINNER' %}selected{% endif %}>Dinner</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Per Page</label>
+          <select name="per_page" class="form-control">
+            <option value="6" {% if per_page == 6 %}selected{% endif %}>6</option>
+            <option value="8" {% if per_page == 8 %}selected{% endif %}>8</option>
+            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="height:42px; padding:0 22px;">
+          Generate
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {% for page in sticker_pages %}
+    <div class="print-page">
+      <div class="stickers-grid per-{{ per_page }}">
+        {% for data in page %}
+          <div class="sticker {% if meal_type == 'LUNCH' %}lunch{% else %}dinner{% endif %}">
+            <div>
+              <div class="sticker-header">
+                <div class="sticker-customer">{{ data.entry.customer.name }}</div>
+                <div class="sticker-location">{{ data.entry.customer.delivery_location }}</div>
+              </div>
+
+              <div class="sticker-body">
+                <div class="sticker-meta">
+                  <span>{{ meal_type }}</span>
+                  <span>{{ entry_date }}</span>
+                </div>
+
+                <div class="sticker-items">
+                  {% for g in data.meal_groups %}
+                    <div class="meal-group">
+                      <div class="meal-title">{{ g.meal_label }}</div>
+
+                      {% if g.custom_items %}
+                        {% for item in g.custom_items %}
+                          <div class="sticker-item">
+                            <span>
+                              {{ item.dish_name }}
+                              {% if item.portion %} ({{ item.portion.portion_label }}){% endif %}
+                              ×{{ item.qty }}
+                            </span>
+                            <span class="src">{{ item.source }}</span>
+                          </div>
+                        {% endfor %}
+                      {% else %}
+                        <div class="sticker-item">
+                          <span>No items</span>
+                          <span class="src">—</span>
+                        </div>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="sticker-total">
+              <span class="label">TOTAL:</span>
+              <span>₹{{ data.entry.total_amount }}</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% empty %}
+    <div class="empty-state" style="grid-column: 1/-1;">
+      <div class="empty-state-icon">📦</div>
+      <div class="empty-state-text">No orders found for selected criteria</div>
+      <div class="empty-state-hint">Try selecting a different date or meal type</div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function printStickers() {
+    window.print();
+  }
+
+  // ✅ Prevent future date selection (JS + input max)
+  document.addEventListener("DOMContentLoaded", function () {
+    const dateInput = document.getElementById("dateInput");
+    const form = document.getElementById("stickerFilters");
+    if (!dateInput) return;
+
+    const pad = (n) => String(n).padStart(2, "0");
+    const now = new Date();
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+    // block future date from picker UI
+    dateInput.setAttribute("max", today);
+
+    const clampIfFuture = () => {
+      const v = dateInput.value;
+      if (!v) return;
+      if (v > today) {
+        dateInput.value = today; // silently clamp
+      }
+    };
+
+    dateInput.addEventListener("change", clampIfFuture);
+    if (form) form.addEventListener("submit", clampIfFuture);
+
+    // also clamp on load if url had future date
+    clampIfFuture();
+  });
+</script>
+{% endblock %}

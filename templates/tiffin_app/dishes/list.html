@@ -1,0 +1,71 @@
+{% extends 'tiffin_app/base.html' %}
+
+{% block title %}Dishes{% endblock %}
+{% block page_title %}Dishes{% endblock %}
+
+{% block top_actions %}
+{% if is_admin %}<a href="{% url 'dish_add' %}" class="btn btn-primary">+ Add Dish</a>{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="filters">
+                    <div class="search-box">
+                        <input type="text" name="search" class="form-control" placeholder="Search dishes..." value="{{ search }}" onkeyup="filterTable(this, 'dish-table')">
+                    </div>
+                </form>
+                
+                <div class="table-container">
+                    <table class="table" id="dish-table">
+                        <thead>
+                            <tr>
+                                <th>Dish Name</th>
+                                <th>Category</th>
+                                <th>Meal Category</th>
+                                <th>Food Type</th>
+                                <th>Availability</th>
+                                <th>Active</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dish in dishes %}
+                            <tr>
+                                <td><strong>{{ dish.name }}</strong></td>
+                                <td>{{ dish.get_category_display }}</td>
+                                <td>{{ dish.get_meal_category_display }}</td>
+                                <td><span class="badge badge-{% if dish.food_type == 'VEG' %}success{% else %}danger{% endif %}">{{ dish.get_food_type_display }}</span></td>
+                                <td>{{ dish.get_availability_display }}</td>
+                                <td>
+                                    {% if dish.is_active %}
+                                        <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td class="table-actions">
+                                    <a href="{% url 'dish_portions' dish.pk %}" class="btn btn-sm btn-success">Portions</a>
+                                    {% if is_admin %}
+                                    <a href="{% url 'dish_edit' dish.pk %}" class="btn btn-sm btn-secondary">Edit</a>
+                                    <form method="post" action="{% url 'dish_delete' dish.pk %}" style="display:inline;" onsubmit="return confirmDelete('Delete {{ dish.name }}?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center">No dishes found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

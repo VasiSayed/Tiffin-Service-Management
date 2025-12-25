@@ -1,0 +1,35 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}Expense Items{% endblock %}
+{% block page_title %}Expense Items{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-primary" href="{% url 'expense_item_create' %}">+ Add Item</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <table class="table">
+      <thead>
+        <tr><th>Category</th><th>Item</th><th>Unit</th><th>Active</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ it.category.icon }} {{ it.category.name }}</td>
+          <td><strong>{{ it.name }}</strong></td>
+          <td>{{ it.default_unit }}</td>
+          <td>{% if it.is_active %}<span class="badge badge-success">Yes</span>{% else %}<span class="badge badge-danger">No</span>{% endif %}</td>
+          <td>
+            <a class="btn btn-sm btn-success" href="{% url 'expense_item_edit' it.id %}">Edit</a>
+            <a class="btn btn-sm btn-danger" href="{% url 'expense_item_delete' it.id %}">Delete</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted">No items yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

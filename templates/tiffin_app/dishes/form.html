@@ -1,0 +1,76 @@
+{% extends 'tiffin_app/base.html' %}
+
+{% block title %}Dish Form{% endblock %}
+{% block page_title %}{% if dish %}Edit{% else %}Add{% endif %} Dish{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    
+        <div class="card">
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="form-group">
+                        <label for="name" class="form-label">Dish Name *</label>
+                        <input type="text" id="name" name="name" class="form-control" value="{{ dish.name|default:'' }}" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="category" class="form-label">Category *</label>
+                            <select id="category" name="category" class="form-control" required>
+                                <option value="">Select Category</option>
+                                <option value="BHAJI" {% if dish.category == 'BHAJI' %}selected{% endif %}>Bhaji</option>
+                                <option value="DAL" {% if dish.category == 'DAL' %}selected{% endif %}>Dal</option>
+                                <option value="RICE" {% if dish.category == 'RICE' %}selected{% endif %}>Rice</option>
+                                <option value="CHAPATI" {% if dish.category == 'CHAPATI' %}selected{% endif %}>Chapati</option>
+                                <option value="OTHER" {% if dish.category == 'OTHER' %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="meal_category" class="form-label">Meal Category *</label>
+                            <select id="meal_category" name="meal_category" class="form-control" required>
+                                <option value="">Select Meal Category</option>
+                                <option value="LUNCH" {% if dish.meal_category == 'LUNCH' %}selected{% endif %}>Lunch</option>
+                                <option value="DINNER" {% if dish.meal_category == 'DINNER' %}selected{% endif %}>Dinner</option>
+                                <option value="BOTH" {% if dish.meal_category == 'BOTH' %}selected{% endif %}>Both</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="food_type" class="form-label">Food Type *</label>
+                            <select id="food_type" name="food_type" class="form-control" required>
+                                <option value="VEG" {% if dish.food_type == 'VEG' or not dish %}selected{% endif %}>Veg</option>
+                                <option value="NON_VEG" {% if dish.food_type == 'NON_VEG' %}selected{% endif %}>Non-Veg</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="availability" class="form-label">Availability *</label>
+                            <select id="availability" name="availability" class="form-control" required>
+                                <option value="AVAILABLE" {% if dish.availability == 'AVAILABLE' or not dish %}selected{% endif %}>Available</option>
+                                <option value="NOT_AVAILABLE" {% if dish.availability == 'NOT_AVAILABLE' %}selected{% endif %}>Not Available</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="is_active" {% if dish.is_active or not dish %}checked{% endif %}>
+                            Active
+                        </label>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <a href="{% url 'dish_list' %}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}Delete Category{% endblock %}
+{% block page_title %}Delete Category{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <div class="alert alert-error">Delete <b>{{ category.icon }} {{ category.name }}</b>?</div>
+    <form method="post">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit">Yes, Delete</button>
+      <a class="btn btn-secondary" href="{% url 'expense_category_list' %}">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

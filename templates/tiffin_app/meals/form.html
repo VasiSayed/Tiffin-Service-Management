@@ -1,0 +1,222 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Meal Form{% endblock %}
+{% block page_title %}{% if meal %}Edit{% else %}Add{% endif %} Meal{% endblock %}
+
+{% block content %}
+<div class="main-content">
+
+  <div class="card">
+    <div class="card-body">
+
+      <form id="mealForm" method="post">
+        {% csrf_token %}
+
+        <div class="form-group">
+          <label class="form-label">Meal Name *</label>
+          <input type="text" id="mealName" name="name" class="form-control"
+                 value="{{ meal.name|default:'' }}"
+                 placeholder="e.g., ₹80 1 Bhaji Dal Rice Chapati" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Meal Type *</label>
+            <select id="mealType" name="meal_type" class="form-control" required>
+              <option value="">Select Type</option>
+              <option value="LUNCH" {% if meal.meal_type == 'LUNCH' %}selected{% endif %}>Lunch</option>
+              <option value="DINNER" {% if meal.meal_type == 'DINNER' %}selected{% endif %}>Dinner</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Price *</label>
+            <input type="number" step="0.01" id="mealPrice" name="price" class="form-control"
+                   value="{{ meal.price|default:'' }}" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="toggle">
+            <input id="showBhaji" type="checkbox" name="show_bhaji_on_sticker"
+              {% if meal.show_bhaji_on_sticker or not meal %}checked{% endif %}>
+            <span class="track"><span class="thumb"></span></span>
+            <span class="text">Show Bhaji on Sticker</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="toggle">
+            <input id="isActive" type="checkbox" name="is_active"
+              {% if meal.is_active or not meal %}checked{% endif %}>
+            <span class="track"><span class="thumb"></span></span>
+            <span class="text">Active</span>
+          </label>
+        </div>
+
+        {% if not meal %}
+        <!-- ✅ BULK TEMPLATE ITEMS -->
+        <div style="margin-top:18px; padding-top:12px; border-top:1px solid #e5e7eb;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <h3 style="margin:0;">Template Items (optional)</h3>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary" onclick="addMealRow()">+ Add Dish</button>
+              <button type="button" class="btn btn-secondary" onclick="addMealRow(true)">+ Add 5</button>
+              <button type="button" class="btn btn-danger" onclick="clearMealRows()">Clear</button>
+            </div>
+          </div>
+
+          <div class="table-container" style="margin-top:12px;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:60%;">Dish</th>
+                  <th style="width:140px;">Default Qty</th>
+                  <th style="width:80px;"></th>
+                </tr>
+              </thead>
+              <tbody id="mealRowsBody"></tbody>
+            </table>
+          </div>
+
+          <div id="mealSaveStatus" style="margin-top:10px; font-weight:600; opacity:0.85;"></div>
+        </div>
+        {% endif %}
+
+        <div class="flex gap-2" style="margin-top:14px;">
+          {% if meal %}
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a href="{% url 'meal_list' %}" class="btn btn-secondary">Cancel</a>
+          {% else %}
+            <button type="button" class="btn btn-primary" id="saveMealBtn" onclick="saveMealBulk()">Save Meal + Items</button>
+            <a href="{% url 'meal_list' %}" class="btn btn-secondary">Cancel</a>
+          {% endif %}
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function getCookie(name) {
+  const v = `; ${document.cookie}`;
+  const parts = v.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return "";
+}
+function getCSRFToken() {
+  return getCookie("csrftoken") || (document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || "");
+}
+
+function dishOptionsHTML() {
+  let html = `<option value="">Select Dish</option>`;
+  {% for d in dishes %}
+    html += `<option value="{{ d.id }}">{{ d.name }} ({{ d.get_category_display }})</option>`;
+  {% endfor %}
+  return html;
+}
+
+function addMealRow(addFive=false) {
+  const tbody = document.getElementById("mealRowsBody");
+  if (!tbody) return; // safety
+
+  const n = addFive ? 5 : 1;
+  for (let i=0; i<n; i++) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <select class="form-control js-dish" required>
+          ${dishOptionsHTML()}
+        </select>
+      </td>
+      <td>
+        <input class="form-control js-qty" type="number" min="1" value="1" />
+      </td>
+      <td>
+        <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">X</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function clearMealRows() {
+  if (!confirm("Clear all template rows?")) return;
+  const tbody = document.getElementById("mealRowsBody");
+  if (tbody) tbody.innerHTML = "";
+}
+
+function collectMealItems() {
+  const trs = Array.from(document.querySelectorAll("#mealRowsBody tr"));
+  return trs.map(tr => ({
+    dish_id: tr.querySelector(".js-dish")?.value,
+    default_qty: tr.querySelector(".js-qty")?.value
+  })).filter(x => x.dish_id);
+}
+
+async function saveMealBulk() {
+  const name = (document.getElementById("mealName")?.value || "").trim();
+  const meal_type = document.getElementById("mealType")?.value || "";
+  const price = document.getElementById("mealPrice")?.value || "";
+
+  // ✅ FIX: ids now exist
+  const show_bhaji_on_sticker = document.getElementById("showBhaji")?.checked ?? true;
+  const is_active = document.getElementById("isActive")?.checked ?? true;
+
+  if (!name) return alert("Meal name required");
+  if (!meal_type) return alert("Meal type required");
+  if (!price) return alert("Price required");
+
+  const items = collectMealItems();
+
+  const btn = document.getElementById("saveMealBtn");
+  const status = document.getElementById("mealSaveStatus");
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = "Saving...";
+
+  try {
+    const res = await fetch("{% url 'meal_bulk_create' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCSRFToken()
+      },
+      body: JSON.stringify({
+        name, meal_type, price,
+        show_bhaji_on_sticker,
+        is_active,
+        items
+      })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      const err = data.error || ("Save failed (HTTP " + res.status + ")");
+      if (status) status.textContent = err;
+      alert(err);
+      return;
+    }
+
+    if (status) status.textContent = "Saved ✔";
+
+    // ✅ safer redirect replace
+    const detailUrl = "{% url 'meal_detail' 999999 %}".replace("999999", String(data.meal_id));
+    window.location.href = detailUrl;
+
+  } catch (e) {
+    if (status) status.textContent = "Network error";
+    alert("Network error while saving");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  // only add rows when creating (tbody exists)
+  if (document.getElementById("mealRowsBody")) {
+    addMealRow();
+    addMealRow();
+  }
+});
+</script>
+{% endblock %}

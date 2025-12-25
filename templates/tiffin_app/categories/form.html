@@ -1,0 +1,27 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        {{ form.name }}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Icon</label>
+        {{ form.icon }}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Active</label>
+        {{ form.is_active }}
+      </div>
+      <button class="btn btn-primary" type="submit">Save</button>
+      <a class="btn btn-secondary" href="{% url 'expense_category_list' %}">Back</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

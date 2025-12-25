@@ -1,0 +1,42 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Dish Portions{% endblock %}
+{% block page_title %}Portions - {{ dish.name }}{% endblock %}
+
+{% block top_actions %}
+{% if is_admin %}<a href="{% url 'portion_add' dish.pk %}" class="btn btn-primary">+ Add Portion</a>{% endif %}
+{% endblock %}
+{% block content %}
+<div class="main-content">
+    
+        <div class="card">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr><th>Portion Label</th><th>ML</th><th>Base Price</th><th>Active</th>{% if is_admin %}<th>Actions</th>{% endif %}</tr>
+                    </thead>
+                    <tbody>
+                        {% for portion in dish.portions.all %}
+                        <tr>
+                            <td><strong>{{ portion.portion_label }}</strong></td>
+                            <td>{{ portion.ml|default:'-' }}</td>
+                            <td>{% if portion.base_price %}₹{{ portion.base_price }}{% else %}-{% endif %}</td>
+                            <td>{% if portion.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge badge-danger">Inactive</span>{% endif %}</td>
+                            {% if is_admin %}
+                            <td class="table-actions">
+                                <form method="post" action="{% url 'portion_delete' portion.pk %}" style="display:inline;" onsubmit="return confirmDelete('Delete portion?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="{% if is_admin %}5{% else %}4{% endif %}" class="text-center">No portions found</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <a href="{% url 'dish_list' %}" class="btn btn-secondary">Back to Dishes</a>
+    </div>
+{% endblock %}

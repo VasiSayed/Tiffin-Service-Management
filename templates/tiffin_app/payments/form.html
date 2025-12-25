@@ -1,0 +1,50 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Add Payment{% endblock %}
+{% block page_title %}Add Payment{% endblock %}
+{% block content %}
+<div class="main-content">
+    
+        <div class="card">
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label class="form-label">Customer *</label>
+                        <select name="customer" class="form-control" required>
+                            <option value="">Select Customer</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.pk }}">{{ customer.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Payment Date *</label>
+                            <input type="date" name="payment_date" class="form-control" value="{{ today }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Amount *</label>
+                            <input type="number" step="0.01" name="amount" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Method *</label>
+                        <select name="method" class="form-control" required>
+                            <option value="CASH">Cash</option>
+                            <option value="UPI">UPI</option>
+                            <option value="BANK">Bank Transfer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Note</label>
+                        <textarea name="note" class="form-control"></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <a href="{% url 'payments' %}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

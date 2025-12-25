@@ -1,0 +1,59 @@
+{% extends "tiffin_app/base.html" %}
+{% block title %}Expense Items{% endblock %}
+{% block page_title %}🧾 Expense Items{% endblock %}
+
+{% block top_actions %}
+  <a class="btn btn-primary" href="{% url 'expense_item_create' %}">➕ Add Item</a>
+  <a class="btn btn-secondary" href="{% url 'expense_category_list' %}">Manage Categories</a>
+  <a class="btn btn-secondary" href="{% url 'expense_dashboard' %}">← Back to Expenses</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+
+  <div class="card">
+    <div class="card-body">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:220px;">Category</th>
+            <th>Item</th>
+            <th style="width:120px;">Default Unit</th>
+            <th style="width:120px;">Active</th>
+            <th style="width:200px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+          <tr>
+            <td>{{ it.category.icon }} {{ it.category.name }}</td>
+            <td><strong>{{ it.name }}</strong></td>
+            <td>{{ it.default_unit }}</td>
+            <td>
+              {% if it.is_active %}
+                <span class="badge badge-success">Active</span>
+              {% else %}
+                <span class="badge badge-danger">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="action-buttons">
+              <a class="btn btn-sm btn-success" href="{% url 'expense_item_edit' it.id %}">Edit</a>
+              <a class="btn btn-sm btn-danger" href="{% url 'expense_item_delete' it.id %}">Delete</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-muted">No items found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div style="margin-top:10px; font-size:0.85rem; opacity:0.75;">
+        Tip: Items are tenant + category scoped, and used in daily expense dropdown.
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

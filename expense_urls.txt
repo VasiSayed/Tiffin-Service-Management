@@ -1,0 +1,18 @@
+# Add these URLs to tiffin_app/urls.py
+
+from django.urls import path
+from . import views
+
+# Add to existing urlpatterns list:
+
+urlpatterns = [
+    # ... existing URLs ...
+    
+    # Expense Management URLs
+    path('expenses/', views.expense_dashboard, name='expense_dashboard'),
+    path('expenses/create/', views.expense_create_entry, name='expense_create'),
+    path('expenses/<int:expense_id>/add-item/', views.expense_add_item, name='expense_add_item'),
+    path('expenses/item/<int:item_id>/delete/', views.expense_delete_item, name='expense_delete_item'),
+    path('expenses/report/', views.expense_monthly_report, name='expense_report'),
+    path('expenses/download/', views.expense_download_csv, name='expense_download'),
+]
