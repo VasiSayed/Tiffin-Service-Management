@@ -4,8 +4,12 @@
 {% block page_title %}Customers{% endblock %}
 
 {% block top_actions %}
-<a href="{% url 'customer_add' %}" class="btn btn-primary">+ Add Customer</a>
+<div class="flex gap-2">
+  <a href="{% url 'customer_add' %}" class="btn btn-primary">+ Add Customer</a>
+  <a href="{% url 'customers_by_location' %}" class="btn btn-secondary">📍 By Location</a>
+</div>
 {% endblock %}
+
 
 {% block content %}
 <div class="main-content">

@@ -1,39 +1,84 @@
 {% extends 'tiffin_app/base.html' %}
 {% block title %}Create Order{% endblock %}
 {% block page_title %}Create Order{% endblock %}
+
 {% block content %}
 <div class="main-content">
-    
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="form-group">
-                        <label class="form-label">Entry Date *</label>
-                        <input type="date" name="entry_date" class="form-control" value="{{ today }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Meal Type *</label>
-                        <select name="meal_type" class="form-control" required>
-                            <option value="LUNCH">Lunch</option>
-                            <option value="DINNER">Dinner</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Customer *</label>
-                        <select name="customer" class="form-control" required id="customer-select">
-                            <option value="">Select Customer</option>
-                            {% for customer in customers %}
-                            <option value="{{ customer.pk }}">{{ customer.name }} - {{ customer.delivery_location }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="flex gap-2">
-                        <button type="submit" class="btn btn-primary">Create Order</button>
-                        <a href="{% url 'daily_entry_list' %}" class="btn btn-secondary">Cancel</a>
-                    </div>
-                </form>
-            </div>
+  <div class="card">
+    <div class="card-body">
+      <form method="post" id="createOrderForm">
+        {% csrf_token %}
+
+        <div class="form-group">
+          <label class="form-label">Entry Date *</label>
+          <input
+            type="date"
+            name="entry_date"
+            class="form-control"
+            value="{{ entry_date|default:today }}"
+            required
+            id="entry-date"
+          >
         </div>
+
+        <div class="form-group">
+          <label class="form-label">Meal Type *</label>
+          <select name="meal_type" class="form-control" required id="meal-type">
+            <option value="LUNCH" {% if meal_type == "LUNCH" %}selected{% endif %}>Lunch</option>
+            <option value="DINNER" {% if meal_type == "DINNER" %}selected{% endif %}>Dinner</option>
+          </select>
+        </div>
+
+        <!-- ✅ Daily Menu Dropdown (optional) -->
+        <div class="form-group">
+          <label class="form-label">Daily Menu (optional)</label>
+          <select name="daily_menu" class="form-control" id="daily-menu">
+            <option value="">No menu (show all dishes)</option>
+
+            {% for m in menus %}
+              <option value="{{ m.id }}"
+                {% if selected_menu_id == m.id|stringformat:"s" %}selected{% endif %}>
+                {{ m.label }}
+              </option>
+            {% empty %}
+              <option value="" disabled>No menu found for this date/meal type</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Customer *</label>
+          <select name="customer" class="form-control" required id="customer-select">
+            <option value="">Select Customer</option>
+            {% for customer in customers %}
+              <option value="{{ customer.pk }}">{{ customer.name }} - {{ customer.delivery_location }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary">Create Order</button>
+          <a href="{% url 'daily_entry_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
     </div>
+  </div>
+</div>
+
+<script>
+  // ✅ when date / meal type changes => reload page with GET params (menus update)
+  const dateEl = document.getElementById("entry-date");
+  const mealEl = document.getElementById("meal-type");
+
+  function reloadForMenus() {
+    const params = new URLSearchParams(window.location.search);
+    params.set("entry_date", dateEl.value || "");
+    params.set("meal_type", mealEl.value || "LUNCH");
+    params.delete("menu_id"); // reset selection when date/type changes
+    window.location.search = params.toString();
+  }
+
+  dateEl.addEventListener("change", reloadForMenus);
+  mealEl.addEventListener("change", reloadForMenus);
+</script>
 {% endblock %}

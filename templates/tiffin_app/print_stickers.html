@@ -8,138 +8,242 @@
 
 {% block extra_css %}
 <style>
-  /* ---------------- Print rules ---------------- */
-  .no-print { }
-  @media print {
-    .no-print { display: none !important; }
-    .print-page { page-break-after: always; }
-    .print-page:last-child { page-break-after: auto; }
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
+/* =========================================================
+   Sticker Page (namespaced) - avoids conflicts with style.css
+========================================================= */
 
-  /* ---------------- Layout ---------------- */
-  .stickers-grid{
-    display:grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    align-items: stretch;
-  }
+.sticker-page{
+  width: 100%;
+}
 
-  /* Optional: if you want height tuning by per_page on print */
-  @media print {
-    .per-6 .sticker  { min-height: 85mm; }
-    .per-8 .sticker  { min-height: 65mm; }
-    .per-10 .sticker { min-height: 52mm; }
+/* ✅ SCREEN: full width, NO A4 white preview box */
+@media screen{
+  .sticker-page .print-page{
+    width: 100%;
+    min-height: auto;
+    margin: 0 0 18px 0;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
   }
+}
 
-  /* ---------------- Sticker (clean) ---------------- */
-  .sticker{
-    background:#fff !important;
-    color:#111827 !important;
-    border:1px solid #e5e7eb !important;
-    border-radius: 14px;
-    padding: 12px;
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
-    box-shadow: 0 8px 18px rgba(0,0,0,.10);
-  }
+/* ✅ PRINT */
+@media print{
+  @page { size: A4; margin: 5mm; }
+  .no-print { display: none !important; }
 
-  /* ✅ Only header colored */
-  .sticker-header{
-    background: var(--primary) !important;
-    color:#fff !important;
-    padding: 12px 14px;
-    border-radius: 12px;
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap: 12px;
-  }
+  .sticker-page .print-page { page-break-after: always; break-after: page; }
+  .sticker-page .print-page:last-child { page-break-after: auto; break-after: auto; }
 
-  .sticker-customer{
-    font-weight: 800;
-    font-size: 20px;
-    letter-spacing: .3px;
-    color:#fff !important;
-    text-transform: uppercase;
-  }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .main-content { padding: 0 !important; }
+  .card { box-shadow: none !important; border: none !important; }
+}
 
-  .sticker-location{
-    font-size: 13px;
-    opacity: .9;
-    color:#fff !important;
-    text-align:right;
-    white-space: nowrap;
-  }
+/* Layout vars */
+.sticker-page{
+  --sticker-size: 39mm;
+  --sticker-gap: 1mm;
+}
+.sticker-page .layout-35{ --sticker-size: 39mm; --sticker-gap: 1mm; }
+.sticker-page .layout-24{ --sticker-size: 48mm; --sticker-gap: 2mm; }
+.sticker-page .layout-12{ --sticker-size: 65mm; --sticker-gap: 3mm; }
 
-  .sticker-body{
-    margin-top: 10px;
-  }
+/* ✅ FULL WIDTH wrapper (no card look) */
+.sticker-page .stickers-wrap{
+  width: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
 
-  .sticker-meta{
-    display:flex;
-    justify-content:space-between;
-    font-size: 12px;
-    color:#374151 !important;
-    padding: 8px 0;
-    border-bottom: 1px dashed #d1d5db;
-    margin-bottom: 8px;
-  }
+/* Grid base */
+.sticker-page .stickers-grid{
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  align-items: start;
+  justify-content: start;
+  align-content: start;
+}
 
-  .meal-title{
-    font-weight: 800;
-    font-size: 14px;
-    margin: 8px 0 6px;
-  }
+/* Layout grids (screen + print BOTH) */
+.sticker-page .stickers-grid.per-35{
+  grid-template-columns: repeat(5, var(--sticker-size)) !important;
+  grid-auto-rows: var(--sticker-size) !important;
+  gap: var(--sticker-gap) !important;
+  justify-content: start !important;
+  align-content: start !important;
+  place-content: start !important;
+}
+.sticker-page .stickers-grid.per-24{
+  grid-template-columns: repeat(4, var(--sticker-size)) !important;
+  grid-auto-rows: var(--sticker-size) !important;
+  gap: var(--sticker-gap) !important;
+  justify-content: start !important;
+  align-content: start !important;
+  place-content: start !important;
+}
+.sticker-page .stickers-grid.per-12{
+  grid-template-columns: repeat(3, var(--sticker-size)) !important;
+  grid-auto-rows: var(--sticker-size) !important;
+  gap: var(--sticker-gap) !important;
+  justify-content: start !important;
+  align-content: start !important;
+  place-content: start !important;
+}
 
-  .sticker-items{
-    display:flex;
-    flex-direction:column;
-    gap: 8px;
-  }
+/* Sticker base */
+.sticker-page .sticker{
+  width: var(--sticker-size);
+  height: var(--sticker-size);
+  background: #fff !important;
+  color: #111827 !important;
+  border: 0.25mm solid #111 !important;
+  border-radius: 2.2mm;
+  padding: 1.2mm;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: none !important;
+}
 
-  .sticker-item{
-    display:flex;
-    justify-content:space-between;
-    gap: 10px;
-    font-size: 13px;
-    color:#111827 !important;
-  }
+/* Header */
+.sticker-page .sticker-header{
+  background: var(--primary) !important;
+  color: #fff !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  border-radius: 2mm;
+  padding: 1.0mm 1.1mm;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4mm;
+}
 
-  .sticker-item .src{
-    font-size: 12px;
-    color:#6b7280 !important;
-    text-transform: uppercase;
-  }
+.sticker-page .sticker-customer{
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.05;
+}
 
-  .sticker-total{
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #e5e7eb;
-    display:flex;
-    justify-content:flex-end;
-    gap: 10px;
-    font-weight: 900;
-    font-size: 18px;
-    color:#111827 !important;
-  }
+.sticker-page .sticker-location{
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: .95;
+  line-height: 1.05;
+}
 
-  .sticker-total .label{
-    font-weight: 800;
-    font-size: 14px;
-    opacity: .9;
-    align-self: flex-end;
-  }
+/* Body layout (IMPORTANT for 35 visibility) */
+.sticker-page .sticker-body{
+  margin-top: 0.6mm;     /* ✅ reduced gap between header and meta */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 
-  /* optional hooks */
-  .sticker.lunch { }
-  .sticker.dinner { }
+.sticker-page .sticker-meta{
+  display: flex;
+  justify-content: space-between;
+  font-weight: 800;
+  color: #374151;
+  padding: 0.35mm 0;
+  margin: 0 0 0.35mm 0;
+  border-bottom: 0.2mm dashed #cbd5e1;
+}
+
+/* Items */
+.sticker-page .sticker-items{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sticker-page .sticker-item{
+  display: flex;
+  justify-content: space-between;
+  gap: 1mm;
+  font-weight: 700;
+}
+
+.sticker-page .sticker-item-name{
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sticker-page .sticker-item-qty{
+  flex: 0 0 auto;
+  font-weight: 900;
+}
+
+.sticker-page .sticker-more{
+  margin-top: 0.3mm;
+  color: #6b7280;
+  font-weight: 800;
+}
+
+/* Total */
+.sticker-page .sticker-total{
+  flex: 0 0 auto;
+  margin-top: 0.6mm;
+  padding-top: 0.45mm;
+  border-top: 0.2mm solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 900;
+}
+
+.sticker-page .sticker-total .label{
+  letter-spacing: .4px;
+}
+
+/* =========================================================
+   FONT SIZES (tuned so 35 ALWAYS shows items)
+========================================================= */
+.sticker-page .per-35 .sticker-customer{ font-size: 7.3pt !important; }
+.sticker-page .per-35 .sticker-location{ font-size: 6.4pt !important; }
+.sticker-page .per-35 .sticker-meta{ font-size: 5.8pt !important; }
+.sticker-page .per-35 .sticker-items{ gap: 0.25mm !important; }
+.sticker-page .per-35 .sticker-item{ font-size: 6.0pt !important; line-height: 1.05 !important; }
+.sticker-page .per-35 .sticker-more{ font-size: 5.6pt !important; }
+.sticker-page .per-35 .sticker-total{ font-size: 6.8pt !important; }
+
+.sticker-page .per-24 .sticker-customer{ font-size: 9.2pt !important; }
+.sticker-page .per-24 .sticker-location{ font-size: 8.0pt !important; }
+.sticker-page .per-24 .sticker-meta{ font-size: 7.2pt !important; }
+.sticker-page .per-24 .sticker-item{ font-size: 7.6pt !important; line-height: 1.08 !important; }
+.sticker-page .per-24 .sticker-total{ font-size: 9.2pt !important; }
+
+.sticker-page .per-12 .sticker-customer{ font-size: 11.5pt !important; }
+.sticker-page .per-12 .sticker-location{ font-size: 10pt !important; }
+.sticker-page .per-12 .sticker-meta{ font-size: 8.2pt !important; }
+.sticker-page .per-12 .sticker-item{ font-size: 8.8pt !important; line-height: 1.12 !important; }
+.sticker-page .per-12 .sticker-total{ font-size: 11pt !important; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="main-content">
+<div class="main-content sticker-page">
   <div class="card no-print">
     <div class="card-body">
       <form id="stickerFilters" method="get" class="filters" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
@@ -157,11 +261,14 @@
         </div>
 
         <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Per Page</label>
-          <select name="per_page" class="form-control">
-            <option value="6" {% if per_page == 6 %}selected{% endif %}>6</option>
-            <option value="8" {% if per_page == 8 %}selected{% endif %}>8</option>
+          <label class="form-label">Layout</label>
+          <select name="layout" id="layoutSelect" class="form-control">
+            <option value="35" {% if per_page == 35 %}selected{% endif %}>35 (A4 5×7 ~40mm)</option>
+            <option value="24" {% if per_page == 24 %}selected{% endif %}>24 (A4 4×6 medium)</option>
+            <option value="12" {% if per_page == 12 %}selected{% endif %}>12 (A4 3×4 large)</option>
             <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+            <option value="8"  {% if per_page == 8 %}selected{% endif %}>8</option>
+            <option value="6"  {% if per_page == 6 %}selected{% endif %}>6</option>
           </select>
         </div>
 
@@ -174,10 +281,10 @@
 
   {% for page in sticker_pages %}
     <div class="print-page">
-      <div class="stickers-grid per-{{ per_page }}">
-        {% for data in page %}
-          <div class="sticker {% if meal_type == 'LUNCH' %}lunch{% else %}dinner{% endif %}">
-            <div>
+      <div class="stickers-wrap">
+        <div class="stickers-grid per-{{ per_page }} layout-{{ per_page }}">
+          {% for data in page %}
+            <div class="sticker">
               <div class="sticker-header">
                 <div class="sticker-customer">{{ data.entry.customer.name }}</div>
                 <div class="sticker-location">{{ data.entry.customer.delivery_location }}</div>
@@ -190,39 +297,31 @@
                 </div>
 
                 <div class="sticker-items">
-                  {% for g in data.meal_groups %}
-                    <div class="meal-group">
-                      <div class="meal-title">{{ g.meal_label }}</div>
-
-                      {% if g.custom_items %}
-                        {% for item in g.custom_items %}
-                          <div class="sticker-item">
-                            <span>
-                              {{ item.dish_name }}
-                              {% if item.portion %} ({{ item.portion.portion_label }}){% endif %}
-                              ×{{ item.qty }}
-                            </span>
-                            <span class="src">{{ item.source }}</span>
-                          </div>
-                        {% endfor %}
-                      {% else %}
-                        <div class="sticker-item">
-                          <span>No items</span>
-                          <span class="src">—</span>
-                        </div>
-                      {% endif %}
+                  {% for item in data.items_display %}
+                    <div class="sticker-item">
+                      <span class="sticker-item-name">{{ item.dish_name }}</span>
+                      <span class="sticker-item-qty">×{{ item.qty }}</span>
+                    </div>
+                  {% empty %}
+                    <div class="sticker-item">
+                      <span class="sticker-item-name">No items</span>
+                      <span class="sticker-item-qty">—</span>
                     </div>
                   {% endfor %}
+
+                  {% if data.items_more_count %}
+                    <div class="sticker-more">+{{ data.items_more_count }} more</div>
+                  {% endif %}
                 </div>
               </div>
-            </div>
 
-            <div class="sticker-total">
-              <span class="label">TOTAL:</span>
-              <span>₹{{ data.entry.total_amount }}</span>
+              <div class="sticker-total">
+                <span class="label">TOTAL</span>
+                <span>₹{{ data.entry.total_amount }}</span>
+              </div>
             </div>
-          </div>
-        {% endfor %}
+          {% endfor %}
+        </div>
       </div>
     </div>
   {% empty %}
@@ -237,36 +336,28 @@
 
 {% block extra_js %}
 <script>
-  function printStickers() {
-    window.print();
-  }
+  function printStickers(){ window.print(); }
 
-  // ✅ Prevent future date selection (JS + input max)
   document.addEventListener("DOMContentLoaded", function () {
     const dateInput = document.getElementById("dateInput");
     const form = document.getElementById("stickerFilters");
-    if (!dateInput) return;
 
-    const pad = (n) => String(n).padStart(2, "0");
-    const now = new Date();
-    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    // ✅ Prevent future date selection
+    if (dateInput) {
+      const pad = (n) => String(n).padStart(2, "0");
+      const now = new Date();
+      const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+      dateInput.setAttribute("max", today);
 
-    // block future date from picker UI
-    dateInput.setAttribute("max", today);
+      const clampIfFuture = () => {
+        const v = dateInput.value;
+        if (v && v > today) dateInput.value = today;
+      };
 
-    const clampIfFuture = () => {
-      const v = dateInput.value;
-      if (!v) return;
-      if (v > today) {
-        dateInput.value = today; // silently clamp
-      }
-    };
-
-    dateInput.addEventListener("change", clampIfFuture);
-    if (form) form.addEventListener("submit", clampIfFuture);
-
-    // also clamp on load if url had future date
-    clampIfFuture();
+      dateInput.addEventListener("change", clampIfFuture);
+      if (form) form.addEventListener("submit", clampIfFuture);
+      clampIfFuture();
+    }
   });
 </script>
 {% endblock %}

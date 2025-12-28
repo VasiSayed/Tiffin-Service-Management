@@ -1,0 +1,374 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Daily Menu{% endblock %}
+{% block page_title %}Daily Menu{% endblock %}
+
+{% block top_actions %}
+  <a class="btn btn-secondary" href="{% url 'daily_menu_list' %}">← Back to Menu List</a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+  <div class="card">
+    <div class="card-body">
+
+      <form id="daily-menu-form" method="post" action="javascript:void(0);">
+        {% csrf_token %}
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Menu Date *</label>
+            <input type="date" id="menu-date" class="form-control" value="{{ today }}" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Meal Type *</label>
+            <select id="meal-type" class="form-control" required>
+              <option value="LUNCH">Lunch</option>
+              <option value="DINNER">Dinner</option>
+              <option value="BOTH">Both</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Select Menu</label>
+            <select id="menu-select" class="form-control">
+              <option value="__new__">+ Create New Menu</option>
+            </select>
+            <div class="form-help">Same date/type me multiple menus possible.</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Menu Name (optional)</label>
+            <input type="text" id="menu-name" class="form-control" placeholder="e.g. Regular / Jain / Special">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Notes (optional)</label>
+            <input type="text" id="menu-notes" class="form-control" placeholder="Any note...">
+          </div>
+        </div>
+
+        <div class="flex gap-2" style="margin-top: 6px;">
+          <button type="button" class="btn btn-secondary" id="btn-refresh">Refresh Menus</button>
+          <button type="button" class="btn btn-secondary" id="btn-new">+ New Menu</button>
+          <button type="button" class="btn btn-secondary" id="btn-add-row">+ Add Item</button>
+        </div>
+
+        <div id="menu-msg" style="margin-top:10px; display:none;"></div>
+
+        <hr style="margin:16px 0;" />
+
+        <div>
+          <div style="font-weight:600; margin-bottom:8px;">Menu Items</div>
+          <div id="items-wrap"></div>
+        </div>
+
+        <div class="flex gap-2" style="justify-content:flex-end; margin-top:14px;">
+          <button type="button" class="btn btn-primary" id="btn-save">Save Menu</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const GET_API  = "{% url 'daily_menu_get_api' %}";
+  const SAVE_API = "{% url 'daily_menu_save_api' %}";
+
+  const dishes = [
+    {% for d in dishes %}
+      { id: {{ d.id }}, name: "{{ d.name|escapejs }}" },
+    {% endfor %}
+  ];
+
+  const formEl   = document.getElementById("daily-menu-form");
+  const dateEl   = document.getElementById("menu-date");
+  const typeEl   = document.getElementById("meal-type");
+  const menuSel  = document.getElementById("menu-select");
+  const nameEl   = document.getElementById("menu-name");
+  const notesEl  = document.getElementById("menu-notes");
+  const wrapEl   = document.getElementById("items-wrap");
+  const msgEl    = document.getElementById("menu-msg");
+
+  let currentMenuId = null;
+  let silentInit = true; // ✅ to stop showing "New menu mode" on load
+
+  formEl.addEventListener("submit", (e) => e.preventDefault());
+
+  function csrfToken() {
+    const inp = formEl.querySelector('input[name="csrfmiddlewaretoken"]');
+    return inp ? inp.value : "";
+  }
+
+  function showMsg(text, ok=true) {
+    if (silentInit) return; // ✅ no messages on initial load
+    msgEl.style.display = "block";
+    msgEl.style.padding = "10px";
+    msgEl.style.borderRadius = "10px";
+    msgEl.style.border = ok ? "1px solid #bbf7d0" : "1px solid #fecaca";
+    msgEl.style.background = ok ? "#dcfce7" : "#fee2e2";
+    msgEl.style.color = ok ? "#166534" : "#991b1b";
+    msgEl.textContent = text;
+    clearTimeout(showMsg._t);
+    showMsg._t = setTimeout(() => { msgEl.style.display = "none"; }, 3000);
+  }
+
+  function escAttr(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function dishOptions(selectedId) {
+    let html = `<option value="">Select Dish</option>`;
+    for (const d of dishes) {
+      const sel = String(d.id) === String(selectedId) ? "selected" : "";
+      html += `<option value="${d.id}" ${sel}>${escAttr(d.name)}</option>`;
+    }
+    return html;
+  }
+
+  function hasDishIdInList(dishId) {
+    return dishes.some(d => String(d.id) === String(dishId));
+  }
+
+  function clearRows() {
+    wrapEl.innerHTML = "";
+  }
+
+  function makeRow({ dish_id=null, dish_name="", qty=1 } = {}) {
+    const row = document.createElement("div");
+    row.className = "card";
+    row.style.marginBottom = "10px";
+
+    let selectDishId = dish_id;
+    let inputDishName = dish_name || "";
+    if (selectDishId && !hasDishIdInList(selectDishId)) selectDishId = "";
+
+    row.innerHTML = `
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Dish</label>
+            <select class="form-control dish-select">${dishOptions(selectDishId)}</select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">OR New Dish Name</label>
+            <input type="text" class="form-control dish-name" placeholder="Type new dish..." value="${escAttr(inputDishName)}">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Qty</label>
+            <input type="number" min="1" class="form-control dish-qty" value="${qty || 1}">
+          </div>
+        </div>
+
+        <div class="flex gap-2" style="justify-content:flex-end; margin-top:10px;">
+          <button type="button" class="btn btn-secondary btn-remove">Remove</button>
+        </div>
+      </div>
+    `;
+
+    const sel = row.querySelector(".dish-select");
+    const nameInp = row.querySelector(".dish-name");
+
+    sel.addEventListener("change", () => { if (sel.value) nameInp.value = ""; });
+    nameInp.addEventListener("input", () => { if (nameInp.value.trim()) sel.value = ""; });
+
+    row.querySelector(".btn-remove").addEventListener("click", () => row.remove());
+    wrapEl.appendChild(row);
+  }
+
+  function collectPayload() {
+    const items = [];
+    wrapEl.querySelectorAll(".card").forEach(card => {
+      const dishId = card.querySelector(".dish-select").value;
+      const dishName = (card.querySelector(".dish-name").value || "").trim();
+      const qtyRaw = card.querySelector(".dish-qty").value;
+      const qty = Math.max(parseInt(qtyRaw || "1", 10) || 1, 1);
+      if (!dishId && !dishName) return;
+
+      items.push({
+        dish_id: dishId ? parseInt(dishId, 10) : null,
+        dish_name: dishId ? "" : dishName,
+        qty: qty,
+      });
+    });
+
+    return {
+      menu_id: currentMenuId,
+      date: dateEl.value,
+      meal_type: typeEl.value,
+      menu_name: (nameEl.value || "").trim(),
+      notes: (notesEl.value || "").trim(),
+      items: items,
+    };
+  }
+
+  async function fetchMenus(menuId=null) {
+    const d = dateEl.value;
+    const mt = typeEl.value;
+    if (!d) { showMsg("Select date", false); return null; }
+
+    let url = `${GET_API}?date=${encodeURIComponent(d)}&meal_type=${encodeURIComponent(mt)}`;
+    if (menuId) url += `&menu_id=${encodeURIComponent(menuId)}`;
+
+    const res = await fetch(url, { headers: { "Accept": "application/json" }});
+    const data = await res.json();
+    if (!data.success) { showMsg(data.error || "Failed to load", false); return null; }
+    return data;
+  }
+
+  function setMenuOptions(menus, selectedVal) {
+    let html = `<option value="__new__">+ Create New Menu</option>`;
+    (menus || []).forEach(m => {
+      const label = (m.menu_name && m.menu_name.trim())
+        ? `${m.menu_name} (${m.meal_type})`
+        : `Menu #${m.id} (${m.meal_type})`;
+      const sel = String(m.id) === String(selectedVal) ? "selected" : "";
+      html += `<option value="${m.id}" ${sel}>${escAttr(label)}</option>`;
+    });
+    menuSel.innerHTML = html;
+
+    // keep selection if exists else __new__
+    const exists = (menus || []).some(m => String(m.id) === String(selectedVal));
+    menuSel.value = exists ? String(selectedVal) : "__new__";
+  }
+
+  async function refreshMenus(keepSelection=true) {
+    const data = await fetchMenus(null);
+    if (!data) return;
+
+    const menus = data.menus || [];
+
+    // ✅ IMPORTANT: preserve typed name/notes/items when changing meal/date
+    const desired = keepSelection && currentMenuId ? currentMenuId : menuSel.value;
+    setMenuOptions(menus, desired);
+
+    // if selected menu exists, load it; else stay in new mode WITHOUT clearing inputs
+    if (menuSel.value !== "__new__") {
+      await loadSelectedMenu();
+    } else {
+      currentMenuId = null;
+      if (!wrapEl.children.length) makeRow();
+    }
+  }
+
+  async function loadSelectedMenu() {
+    const val = menuSel.value;
+
+    if (val === "__new__") {
+      currentMenuId = null;
+      if (!wrapEl.children.length) makeRow();
+      return;
+    }
+
+    const data = await fetchMenus(val);
+    if (!data) return;
+
+    const menu = data.menu;
+    if (!menu) return;
+
+    currentMenuId = menu.id;
+    nameEl.value = menu.menu_name || "";
+    notesEl.value = menu.notes || "";
+
+    clearRows();
+    const items = menu.items || [];
+    if (!items.length) makeRow();
+    else items.forEach(it => makeRow(it));
+
+    showMsg("Menu loaded ✅", true);
+  }
+
+  async function saveMenu() {
+    silentInit = false;
+    const payload = collectPayload();
+
+    if (!payload.date) { showMsg("Select date", false); return; }
+    if (!payload.items.length) { showMsg("Add at least 1 item", false); return; }
+
+    const res = await fetch(SAVE_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRFToken": csrfToken(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    // ✅ handle non-JSON / 500 safely
+    let data = null;
+    try { data = await res.json(); }
+    catch {
+      const txt = await res.text();
+      showMsg("Server error. Check console/logs.", false);
+      console.error("Non-JSON response:", txt);
+      return;
+    }
+
+    if (!data.success) {
+      showMsg(data.error || "Save failed", false);
+      return;
+    }
+
+    currentMenuId = data.menu_id;
+    showMsg(`Saved ✅ Items: ${data.items_created}`, true);
+
+    await refreshMenus(true);
+    menuSel.value = String(currentMenuId);
+    await loadSelectedMenu();
+  }
+
+  // Buttons
+  document.getElementById("btn-add-row").addEventListener("click", () => { silentInit = false; makeRow(); });
+  document.getElementById("btn-refresh").addEventListener("click", () => { silentInit = false; refreshMenus(true); });
+  document.getElementById("btn-new").addEventListener("click", () => {
+    silentInit = false;
+    currentMenuId = null;
+    menuSel.value = "__new__";
+    // ✅ do NOT auto show message on load; only on click
+    showMsg("New menu mode ✅", true);
+  });
+  document.getElementById("btn-save").addEventListener("click", saveMenu);
+
+  // Change events
+  menuSel.addEventListener("change", () => { silentInit = false; loadSelectedMenu(); });
+
+  // ✅ preserve typed values on meal/date change
+  dateEl.addEventListener("change", () => refreshMenus(false));
+  typeEl.addEventListener("change", () => refreshMenus(false));
+
+  window.addEventListener("load", async () => {
+    // ✅ prevent future date
+    const t = new Date();
+    const yyyy = t.getFullYear();
+    const mm = String(t.getMonth()+1).padStart(2, "0");
+    const dd = String(t.getDate()).padStart(2, "0");
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    dateEl.max = todayStr;
+
+    const params = new URLSearchParams(window.location.search);
+    const qDate = params.get("date");
+    const qType = (params.get("meal_type") || "").toUpperCase();
+
+    if (qDate) dateEl.value = qDate;
+    if (["LUNCH","DINNER","BOTH"].includes(qType)) typeEl.value = qType;
+    if (!dateEl.value) dateEl.value = todayStr;
+
+    await refreshMenus(true);
+
+    if (!wrapEl.children.length) makeRow();
+
+    // ✅ enable messages after initial load
+    setTimeout(() => { silentInit = false; }, 200);
+  });
+</script>
+{% endblock %}

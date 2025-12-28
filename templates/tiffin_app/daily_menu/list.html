@@ -1,0 +1,113 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Daily Menu List{% endblock %}
+{% block page_title %}Daily Menu List{% endblock %}
+
+{% block top_actions %}
+  <a class="btn btn-primary"
+     href="{% url 'daily_menu_page' %}?date={{ selected_date }}&meal_type={{ selected_meal_type|default:'LUNCH' }}&new=1">
+    + Create Menu
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+  <div class="card">
+    <div class="card-body">
+
+      <!-- ✅ Filters in ONE LINE (same structure as Daily Entry) -->
+      <form method="get" class="filters" id="filterForm">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input
+            type="date"
+            name="date"
+            class="form-control"
+            value="{{ selected_date }}"
+            onchange="this.form.submit()"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Meal Type</label>
+          <div class="toggle-group">
+            <button
+              type="button"
+              class="toggle-btn {% if selected_meal_type == 'LUNCH' %}active{% endif %}"
+              onclick="window.location='?date={{ selected_date }}&meal_type=LUNCH'">
+              Lunch
+            </button>
+
+            <button
+              type="button"
+              class="toggle-btn {% if selected_meal_type == 'DINNER' %}active{% endif %}"
+              onclick="window.location='?date={{ selected_date }}&meal_type=DINNER'">
+              Dinner
+            </button>
+
+            <button
+              type="button"
+              class="toggle-btn {% if selected_meal_type == 'BOTH' %}active{% endif %}"
+              onclick="window.location='?date={{ selected_date }}&meal_type=BOTH'">
+              Both
+            </button>
+
+            <button
+              type="button"
+              class="toggle-btn {% if selected_meal_type != 'LUNCH' and selected_meal_type != 'DINNER' and selected_meal_type != 'BOTH' %}active{% endif %}"
+              onclick="window.location='?date={{ selected_date }}'">
+              All
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <hr style="margin:16px 0;" />
+
+      {% if menus %}
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Meal Type</th>
+                <th>Menu Name</th>
+                <th>Items</th>
+                <th>Notes</th>
+                <th style="width:140px;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in menus %}
+              <tr>
+                <td>{{ m.date }}</td>
+                <td>{{ m.meal_type }}</td>
+                <td>{{ m.menu_name }}</td>
+                <td>{{ m.items_text }}</td>
+                <td>{{ m.notes }}</td>
+                <td>
+                  <a class="btn btn-sm btn-primary"
+                     href="{% url 'daily_menu_page' %}?date={{ m.date|date:'Y-m-d' }}&meal_type={{ m.meal_type }}&menu_id={{ m.id }}">
+                    Edit
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div style="padding:10px; border:1px solid #e5e7eb; border-radius:10px;">
+          No menu found for selected filter.
+          <div style="margin-top:8px;">
+            <a class="btn btn-primary"
+               href="{% url 'daily_menu_page' %}?date={{ selected_date }}&meal_type={{ selected_meal_type|default:'LUNCH' }}&new=1">
+              Create Menu
+            </a>
+          </div>
+        </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

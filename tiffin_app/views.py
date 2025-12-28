@@ -1,8 +1,97 @@
 import json
+import json
+from datetime import date
+from django.contrib.auth.decorators import login_required
+from django.db.models import Prefetch, Q
+from django.shortcuts import render
+from .models import DailyEntry, OrderMealCustom  
+from django.contrib.auth.decorators import login_required
+from django.db import transaction, IntegrityError
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_POST
+from .models import Dish, DailyMenu, DailyMenuItem
+from datetime import date as dt_date
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.utils.dateparse import parse_date
+import json
+from datetime import date
+from django.contrib.auth.decorators import login_required
+from django.db.models import Case, When, IntegerField
+from django.shortcuts import render, get_object_or_404
+from django.utils.dateparse import parse_date
+from .models import DailyEntry, DailyMenu  # adjust import if needed
+from datetime import date as dt_date
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_GET, require_POST
+import json
+import csv
+
+from datetime import date
+from django.contrib.auth.decorators import login_required
+from django.db.models import Prefetch
+from django.shortcuts import render
+from urllib.parse import quote
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count, Q, Value as V, Min
+from django.db.models.functions import Lower, Trim, Coalesce
+from django.shortcuts import render, redirect
+from .models import Customer
+from .models import DailyEntry, OrderMealCustom  # adjust import path if different
+from decimal import Decimal
+from datetime import date as dt_date
+from decimal import Decimal
+import json
+from datetime import date as dt_date
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.utils.dateparse import parse_date
+from .models import ExpenseCategory, ExpenseItem, DailyExpense
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.db.models import Sum, Count
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.utils.dateparse import parse_date
+from .models import ExpenseCategory, ExpenseItem, DailyExpense
+from django.views.decorators.http import require_GET
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from .models import ExpenseItem
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views.decorators.http import require_http_methods
+from .models import ExpenseCategory, ExpenseItem
+from .expense_forms import ExpenseCategoryForm, ExpenseItemForm
+from .models import Dish, DailyMenu, DailyMenuItem
+from django.http import JsonResponse
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_GET
 from datetime import date
 from decimal import Decimal
 from functools import wraps
-
+from datetime import date
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.dateparse import parse_date
+from datetime import date
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.db.models import Prefetch
+from .models import DailyEntry, OrderMealCustom  
+from .models import Customer, DailyEntry, DailyMenu, Dish, Meal
 from django.contrib import messages
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
@@ -12,22 +101,14 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET
-
 from .models import (
     Customer, Dish, DishPortion, Meal, MealDishPortion,
     DailyEntry, OrderMeal, OrderMealCustom, Payment,
     ExpenseCategory, ExpenseItem
 )
-
 from .forms_expenses import ExpenseCategoryForm, ExpenseItemForm
 
-# If you have these expense views in separate file, comment these out OR remove duplicates.
-# from .expense_views_addon import (
-#     expense_dashboard, expense_create_entry, expense_add_item, expense_delete_item,
-#     expense_monthly_report, expense_download_csv
-# )
 
-# ---------------- helpers ----------------
 def _tenant(request):
     return request.user.profile.tenant
 
@@ -505,17 +586,36 @@ def daily_entry_list(request):
     )
 
 
+def _compact_items(items, max_items=5):
+    items = [x for x in items if x]
+    if len(items) <= max_items:
+        return ", ".join(items) if items else "-"
+    return ", ".join(items[:max_items]) + f" +{len(items) - max_items} more"
+
+
 @login_required
 def daily_entry_add(request):
     tenant = _tenant(request)
 
+    # ✅ for GET reload (date/type change)
+    entry_date_raw = request.GET.get("entry_date") or str(date.today())
+    meal_type = (request.GET.get("meal_type") or "LUNCH").strip().upper()
+    selected_menu_id = (request.GET.get("menu_id") or "").strip()
+
+    entry_date_obj = parse_date(entry_date_raw) or date.today()
+    entry_date = entry_date_obj.isoformat()
+
     if request.method == "POST":
         customer = get_object_or_404(Customer, pk=request.POST["customer"], tenant=tenant)
-        entry_date = request.POST["entry_date"]
-        meal_type = request.POST["meal_type"]
+        entry_date_post = request.POST["entry_date"]
+        meal_type_post = request.POST["meal_type"]
+        menu_id = (request.POST.get("daily_menu") or "").strip()
 
         entry, created = DailyEntry.objects.get_or_create(
-            tenant=tenant, customer=customer, entry_date=entry_date, meal_type=meal_type
+            tenant=tenant,
+            customer=customer,
+            entry_date=entry_date_post,
+            meal_type=meal_type_post,
         )
 
         if created:
@@ -523,13 +623,60 @@ def daily_entry_add(request):
         else:
             messages.info(request, "Order already exists, opening it")
 
-        return redirect("daily_entry_detail", pk=entry.pk)
+        url = reverse("daily_entry_detail", kwargs={"pk": entry.pk})
+        if menu_id:
+            url = f"{url}?menu_id={menu_id}"
+        return redirect(url)
 
     customers = Customer.objects.filter(tenant=tenant, is_active=True)
+
+    # ✅ menus for selected date + meal_type
+    # LUNCH -> show LUNCH + BOTH menus
+    # DINNER -> show DINNER + BOTH menus
+    allowed_types = [meal_type, "BOTH"] if meal_type in ("LUNCH", "DINNER") else ["BOTH"]
+
+    menus_qs = (
+        DailyMenu.objects.filter(tenant=tenant, date=entry_date_obj, meal_type__in=allowed_types)
+        .prefetch_related("items__dish")
+        .order_by("-id")
+    )
+
+    # ✅ Build display label: Menu Name + Items (NO meal_type in label)
+    menus = []
+    for m in menus_qs:
+        item_names = []
+        for it in m.items.all():
+            if it.dish_id and it.dish:
+                item_names.append(it.dish.name)
+            elif it.dish_name:
+                item_names.append(it.dish_name)
+
+        menu_title = (m.menu_name or "").strip() or f"Menu #{m.id}"
+        items_text = _compact_items(item_names, max_items=6)
+
+        # optional: show short notes at end (NOT meal type)
+        label = f"{menu_title} — {items_text}"
+        if m.notes:
+            label += f" ({m.notes[:25]}{'...' if len(m.notes) > 25 else ''})"
+
+        menus.append(
+            {
+                "id": m.id,
+                "label": label,
+            }
+        )
+
     return render(
         request,
         "tiffin_app/daily_entry/form.html",
-        {"customers": customers, "today": str(date.today())},
+        {
+            "customers": customers,
+            "today": str(date.today()),
+            "entry_date": entry_date,
+            "meal_type": meal_type,
+            "menus": menus,  # ✅ list of dicts {id,label}
+            "selected_menu_id": selected_menu_id,
+        },
     )
 
 
@@ -537,13 +684,37 @@ def daily_entry_add(request):
 def daily_entry_detail(request, pk):
     tenant = _tenant(request)
     entry = get_object_or_404(DailyEntry, pk=pk, tenant=tenant)
+
     meals = Meal.objects.filter(tenant=tenant, meal_type=entry.meal_type, is_active=True)
-    dishes = Dish.objects.filter(tenant=tenant, is_active=True)
+
+    menu_id = (request.GET.get("menu_id") or "").strip()
+    selected_menu = None
+
+    # ✅ default all dishes
+    dishes_qs = Dish.objects.filter(tenant=tenant, is_active=True)
+
+    # ✅ if menu selected => dishes only from that menu
+    if menu_id:
+        selected_menu = get_object_or_404(
+            DailyMenu,
+            pk=menu_id,
+            tenant=tenant,
+            date=entry.entry_date,
+            meal_type__in=[entry.meal_type, "BOTH"],  # ✅ allow BOTH menu for Lunch/Dinner order
+        )
+
+        dish_ids = selected_menu.items.values_list("dish_id", flat=True)
+        dishes_qs = dishes_qs.filter(id__in=dish_ids)
 
     return render(
         request,
         "tiffin_app/daily_entry/detail.html",
-        {"entry": entry, "meals": meals, "dishes": dishes},
+        {
+            "entry": entry,
+            "meals": meals,
+            "dishes": dishes_qs,
+            "selected_menu": selected_menu,
+        },
     )
 
 
@@ -775,12 +946,15 @@ def daily_entry_bulk_create(request):
     results = [{"entry_id": e.id, "customer_id": e.customer_id, "customer_name": e.customer.name} for e in all_entries]
     return JsonResponse({"success": True, "count": len(results), "entries": results})
 
-from datetime import date
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from django.db.models import Prefetch
 
-from .models import DailyEntry, OrderMealCustom  # adjust import path if needed
+from datetime import date
+from collections import OrderedDict
+
+from django.contrib.auth.decorators import login_required
+from django.db.models import Prefetch, Q
+from django.shortcuts import render
+
+from .models import DailyEntry, OrderMealCustom, DailyMenu, DailyMenuItem  # ✅ use your actual paths
 
 
 def _chunk_list(lst, n):
@@ -796,20 +970,26 @@ def print_stickers(request):
     entry_date = request.GET.get("date") or str(date.today())
     meal_type = (request.GET.get("meal_type") or "LUNCH").upper()
 
-    # per_page safe
+    layout_raw = (request.GET.get("layout") or request.GET.get("per_page") or "35").strip()
     try:
-        per_page = int(request.GET.get("per_page") or 10)
+        per_page = int(layout_raw)
     except Exception:
-        per_page = 10
-    if per_page not in (6, 8, 10):
-        per_page = 10
+        per_page = 35
 
-    # ✅ Prefetch ONLY custom items (source=CUSTOM)
+    if per_page not in (35, 24, 12, 10, 8, 6):
+        per_page = 35
+
+    max_lines = {35: 3, 24: 6, 12: 10}.get(per_page, 999)
+
+    # ✅ Prefetch CUSTOM items
     custom_items_qs = (
         OrderMealCustom.objects.filter(source="CUSTOM")
         .select_related("dish", "portion")
         .order_by("dish_name", "id")
     )
+
+    # ✅ Prefetch DailyMenu items (for entry.menu)
+    menu_items_qs = DailyMenuItem.objects.select_related("dish").order_by("id")
 
     entries = (
         DailyEntry.objects.filter(
@@ -817,34 +997,92 @@ def print_stickers(request):
             entry_date=entry_date,
             meal_type=meal_type,
         )
-        .select_related("customer")
+        .select_related("customer", "menu")  # ✅ FIXED: menu
         .prefetch_related(
             "order_meals__meal",
             Prefetch("order_meals__custom_items", queryset=custom_items_qs),
+            Prefetch("menu__items", queryset=menu_items_qs),  # ✅ FIXED: menu__items
+        )
+        .order_by("customer__delivery_location", "customer__name", "id")
+    )
+
+    # ✅ Fallback menu (if entry.menu is null): pick tenant+date menu_type OR BOTH
+    fallback_menu = (
+        DailyMenu.objects.filter(
+            tenant=tenant,
+            date=entry_date,
+        )
+        .filter(Q(meal_type=meal_type) | Q(meal_type="BOTH"))
+        .prefetch_related(Prefetch("items", queryset=menu_items_qs))
+        .order_by(
+            # exact meal_type first, then BOTH
+            # (Django doesn't have easy bool order; this works with Case if you want,
+            # but simple order_by('meal_type') isn't reliable. We'll do small logic below.)
+            "id"
         )
     )
 
+    # choose best fallback menu
+    fallback_exact = None
+    fallback_both = None
+    for m in fallback_menu:
+        if m.meal_type == meal_type and fallback_exact is None:
+            fallback_exact = m
+        if m.meal_type == "BOTH" and fallback_both is None:
+            fallback_both = m
+    fallback_menu_obj = fallback_exact or fallback_both
+
     sticker_data = []
     for entry in entries:
-        meal_groups = []
+        items_map = OrderedDict()
 
+        # ✅ 1) Daily Menu items ALWAYS print (entry.menu else fallback)
+        menu_obj = entry.menu or fallback_menu_obj
+        if menu_obj:
+            for mi in menu_obj.items.all():
+                name = (getattr(mi, "dish_name", "") or "").strip()
+                if not name and getattr(mi, "dish_id", None):
+                    name = (mi.dish.name or "").strip()
+                if not name:
+                    continue
+
+                qty = getattr(mi, "qty", 1) or 1
+                try:
+                    qty = int(qty)
+                except Exception:
+                    qty = 1
+
+                items_map[name] = items_map.get(name, 0) + qty
+
+        # ✅ 2) Custom items (optional add-on)
         for om in entry.order_meals.all():
-            # ✅ now om.custom_items already contains ONLY CUSTOM because of Prefetch queryset
-            custom_items = list(om.custom_items.all())
+            for ci in om.custom_items.all():
+                name = (getattr(ci, "dish_name", "") or "").strip()
+                if not name and getattr(ci, "dish_id", None):
+                    name = (ci.dish.name or "").strip()
+                if not name:
+                    continue
 
-            # ✅ optional: skip meals with no CUSTOM items (so template items won't show at all)
-            if not custom_items:
-                continue
+                qty = getattr(ci, "qty", 1) or 1
+                try:
+                    qty = int(qty)
+                except Exception:
+                    qty = 1
 
-            meal_groups.append(
-                {
-                    "order_meal": om,
-                    "meal_label": str(om),  # e.g. "Maharaja Meal x2"
-                    "custom_items": custom_items,  # ONLY CUSTOM rows
-                }
-            )
+                items_map[name] = items_map.get(name, 0) + qty
 
-        sticker_data.append({"entry": entry, "meal_groups": meal_groups})
+        items = [{"dish_name": k, "qty": v} for k, v in items_map.items()]
+        items_display = items[:max_lines]
+        items_more_count = max(0, len(items) - len(items_display))
+
+        sticker_data.append(
+            {
+                "entry": entry,
+                "items": items,
+                "items_display": items_display,
+                "items_more_count": items_more_count,
+            }
+        )
 
     sticker_pages = _chunk_list(sticker_data, per_page)
 
@@ -852,15 +1090,13 @@ def print_stickers(request):
         request,
         "tiffin_app/print_stickers.html",
         {
-            "sticker_data": sticker_data,     # kept (if template uses it)
-            "sticker_pages": sticker_pages,   # for per-page printing
+            "sticker_pages": sticker_pages,
             "entry_date": entry_date,
             "meal_type": meal_type,
             "per_page": per_page,
         },
     )
 
-# ---------------- payments ----------------
 @login_required
 @require_admin
 def payments(request):
@@ -1096,31 +1332,6 @@ def expense_items_api(request):
 
     return JsonResponse({"success": True, "items": data})
 
-
-
-
-import json
-import csv
-from decimal import Decimal
-from datetime import date as dt_date
-
-from decimal import Decimal
-import json
-from datetime import date as dt_date
-from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect
-from django.utils.dateparse import parse_date
-from .models import ExpenseCategory, ExpenseItem, DailyExpense
-from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.db.models import Sum, Count
-from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render, get_object_or_404, redirect
-from django.utils.dateparse import parse_date
-
-from .models import ExpenseCategory, ExpenseItem, DailyExpense
 
 
 def _tenant(request):
@@ -1400,11 +1611,6 @@ def expense_download_csv(request):
 
     return response
 
-# tiffin_app/views.py  (add at bottom)
-from django.views.decorators.http import require_GET
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from .models import ExpenseItem
 
 @require_GET
 @login_required
@@ -1433,15 +1639,6 @@ def expense_items_api(request):
 
 
 
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404, redirect
-from django.views.decorators.http import require_http_methods
-
-from .models import ExpenseCategory, ExpenseItem
-from .expense_forms import ExpenseCategoryForm, ExpenseItemForm
-
-# ✅ Category CRUD
 @login_required
 def expense_category_list(request):
     tenant = _tenant(request)
@@ -1565,4 +1762,404 @@ def expense_item_delete(request, pk):
         return redirect("expense_item_list")
 
     return render(request, "tiffin_app/expenses/items/delete.html", {"item": item})
+
+
+
+
+@login_required
+def daily_menu_page(request):
+    """
+    HTML page: create/update DailyMenu + Items
+    """
+    tenant = _tenant(request)
+
+    # (Optional) only admin
+    if request.user.profile.role != "ADMIN":
+        return JsonResponse({"detail": "Access denied"}, status=403)
+
+    dishes = Dish.objects.filter(tenant=tenant, is_active=True).order_by("name")
+    return render(
+        request,
+        "tiffin_app/daily_menu/form.html",
+        {
+            "today": dt_date.today().isoformat(),
+            "dishes": dishes,
+        },
+    )
+
+
+@require_GET
+@login_required
+def daily_menu_get_api(request):
+    tenant = _tenant(request)
+    if request.user.profile.role != "ADMIN":
+        return JsonResponse({"success": False, "error": "Access denied"}, status=403)
+
+    d = parse_date(request.GET.get("date") or "")
+    meal_type = (request.GET.get("meal_type") or "LUNCH").strip().upper()
+    menu_id = (request.GET.get("menu_id") or "").strip()
+
+    if not d:
+        return JsonResponse({"success": False, "error": "Invalid date"}, status=400)
+    if meal_type not in ("LUNCH", "DINNER", "BOTH"):
+        return JsonResponse({"success": False, "error": "Invalid meal_type"}, status=400)
+
+    # ✅ if LUNCH/DINNER => include BOTH menus also
+    allowed_types = ["BOTH"] if meal_type == "BOTH" else [meal_type, "BOTH"]
+
+    qs = (
+        DailyMenu.objects.filter(tenant=tenant, date=d, meal_type__in=allowed_types)
+        .prefetch_related("items__dish")
+        .order_by("-id")
+    )
+
+    menus_list = [
+        {"id": m.id, "menu_name": (m.menu_name or f"Menu #{m.id}"), "meal_type": m.meal_type, "notes": (m.notes or "")}
+        for m in qs
+    ]
+
+    if not menu_id:
+        return JsonResponse({"success": True, "menus": menus_list, "menu": None})
+
+    menu = get_object_or_404(DailyMenu, pk=menu_id, tenant=tenant, date=d)
+    # ensure selected menu is in allowed types
+    if menu.meal_type not in allowed_types:
+        return JsonResponse({"success": False, "error": "Menu not allowed for selected meal_type"}, status=400)
+
+    items = []
+    for it in menu.items.all():
+        items.append(
+            {
+                "dish_id": it.dish_id,
+                "dish_name": it.dish.name if it.dish_id else (it.dish_name or ""),
+                "qty": it.qty,
+            }
+        )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "menus": menus_list,
+            "menu": {
+                "id": menu.id,
+                "date": menu.date.isoformat(),
+                "meal_type": menu.meal_type,
+                "menu_name": menu.menu_name or "",
+                "notes": menu.notes or "",
+                "items": items,
+            },
+        }
+    )
+
+
+
+@require_POST
+@login_required
+@transaction.atomic
+def daily_menu_save_api(request):
+    tenant = _tenant(request)
+    if request.user.profile.role != "ADMIN":
+        return JsonResponse({"success": False, "error": "Access denied"}, status=403)
+
+    if "application/json" not in (request.content_type or ""):
+        return JsonResponse({"success": False, "error": "Send JSON"}, status=400)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+
+    d = parse_date(payload.get("date") or "")
+    meal_type = (payload.get("meal_type") or "").strip().upper()
+    notes = (payload.get("notes") or "").strip()
+
+    # ✅ normalize name -> None if empty
+    raw_name = (payload.get("menu_name") or "").strip()
+    menu_name = raw_name if raw_name else None
+
+    menu_id = payload.get("menu_id")  # optional
+    rows = payload.get("items") or []
+
+    if not d:
+        return JsonResponse({"success": False, "error": "Invalid date"}, status=400)
+    if meal_type not in ("LUNCH", "DINNER", "BOTH"):
+        return JsonResponse({"success": False, "error": "Invalid meal_type"}, status=400)
+    if not isinstance(rows, list) or len(rows) == 0:
+        return JsonResponse({"success": False, "error": "At least 1 item required"}, status=400)
+
+    try:
+        # ✅ update existing
+        if menu_id:
+            menu = get_object_or_404(DailyMenu, pk=menu_id, tenant=tenant)
+
+            if menu.date != d:
+                return JsonResponse({"success": False, "error": "menu_id does not match date"}, status=400)
+
+            menu.meal_type = meal_type
+            menu.notes = notes
+            menu.menu_name = menu_name
+            menu.save()
+            created = False
+
+        # ✅ create new
+        else:
+            menu = DailyMenu.objects.create(
+                tenant=tenant,
+                date=d,
+                meal_type=meal_type,
+                notes=notes,
+                menu_name=menu_name,
+            )
+            created = True
+
+    except IntegrityError:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Same Menu Name already exists for this Date + Meal Type. Please change Menu Name or select existing menu."
+            },
+            status=400,
+        )
+
+    # replace items
+    menu.items.all().delete()
+
+    def to_int(v, default=1):
+        try:
+            x = int(v)
+            return x if x > 0 else default
+        except Exception:
+            return default
+
+    dish_ids = []
+    for r in rows:
+        try:
+            did = int(r.get("dish_id")) if r.get("dish_id") not in (None, "", "null") else None
+        except Exception:
+            did = None
+        if did:
+            dish_ids.append(did)
+    dish_ids = list(set(dish_ids))
+
+    dish_map = {
+        dobj.id: dobj
+        for dobj in Dish.objects.filter(tenant=tenant, is_active=True, id__in=dish_ids)
+    }
+
+    items_to_create = []
+    for idx, r in enumerate(rows, start=1):
+        try:
+            did = int(r.get("dish_id")) if r.get("dish_id") not in (None, "", "null") else None
+        except Exception:
+            did = None
+
+        dish_name = (r.get("dish_name") or "").strip()
+        qty = to_int(r.get("qty"), default=1)
+
+        if did:
+            if did not in dish_map:
+                return JsonResponse({"success": False, "error": f"Invalid dish_id in row #{idx}"}, status=400)
+            dish_obj = dish_map[did]
+        else:
+            if not dish_name:
+                return JsonResponse({"success": False, "error": f"Dish required in row #{idx}"}, status=400)
+
+            existing = Dish.objects.filter(tenant=tenant, name__iexact=dish_name).first()
+            if existing:
+                dish_obj = existing
+            else:
+                dish_obj = Dish.objects.create(
+                    tenant=tenant,
+                    name=dish_name,
+                    category="OTHER",
+                    meal_category=meal_type,  # BOTH ok
+                    food_type="VEG",
+                    availability="AVAILABLE",
+                    is_active=True,
+                )
+
+        items_to_create.append(DailyMenuItem(daily_menu=menu, dish=dish_obj, qty=qty))
+
+    DailyMenuItem.objects.bulk_create(items_to_create)
+
+    return JsonResponse(
+        {"success": True, "menu_id": menu.id, "created": created, "items_created": len(items_to_create)}
+    )
+
+
+
+@login_required
+@require_admin
+def daily_menu_list(request):
+    tenant = _tenant(request)
+
+    selected_date = parse_date(request.GET.get("date") or "") or dt_date.today()
+    meal_type = (request.GET.get("meal_type") or "").strip().upper()  # LUNCH/DINNER/BOTH/""
+
+    qs = (
+        DailyMenu.objects.filter(tenant=tenant, date=selected_date)
+        .prefetch_related("items__dish")
+        .order_by("meal_type", "id")
+    )
+
+    if meal_type in ("LUNCH", "DINNER", "BOTH"):
+        qs = qs.filter(meal_type=meal_type)
+
+    menus = []
+    for m in qs:
+        items = []
+        for it in m.items.all():
+            if it.dish_id:
+                items.append(it.dish.name)
+            elif it.dish_name:
+                items.append(it.dish_name)
+        menus.append(
+    {
+        "id": m.id,
+        "date": m.date,
+        "meal_type": m.meal_type,
+        "menu_name": m.menu_name or f"Menu #{m.id}",  # ✅ add
+        "notes": m.notes or "",
+        "items_text": ", ".join(items) if items else "-",
+    }
+        )
+
+    return render(
+        request,
+        "tiffin_app/daily_menu/list.html",
+        {
+            "today": dt_date.today().isoformat(),
+            "selected_date": selected_date.isoformat(),
+            "selected_meal_type": meal_type,
+            "menus": menus,
+        },
+    )
+
+
+
+
+@login_required
+def customers_by_location(request):
+    tenant = _tenant(request)
+
+    q = (request.GET.get("q") or "").strip()
+    sort = (request.GET.get("sort") or "count_desc").strip()
+
+    # normalize location key: lower(trim(coalesce(delivery_location,"")))
+    base = (
+        Customer.objects.filter(tenant=tenant)
+        .annotate(loc_key=Lower(Trim(Coalesce("delivery_location", V("")))))
+    )
+
+    if q:
+        base = base.filter(loc_key__contains=q.lower())
+
+    rows = (
+        base.values("loc_key")
+        .annotate(
+            total=Count("id"),
+            daily_yes=Count("id", filter=Q(daily_customer=True)),
+            daily_no=Count("id", filter=Q(daily_customer=False)),
+            sample_display=Min("delivery_location"),
+        )
+    )
+
+    # sorting
+    if sort == "count_asc":
+        rows = rows.order_by("total", "loc_key")
+    elif sort == "az":
+        rows = rows.order_by("loc_key")
+    elif sort == "za":
+        rows = rows.order_by("-loc_key")
+    else:  # count_desc (default)
+        rows = rows.order_by("-total", "loc_key")
+
+    # final normalize display text in python (clean)
+    out = []
+    for r in rows:
+        key = (r.get("loc_key") or "").strip()
+        display = (r.get("sample_display") or "").strip()
+        if not key:
+            display = "(No Location)"
+            key = ""
+        else:
+            display = display or key
+
+        out.append(
+            {
+                "loc_key": key,
+                "display": display,
+                "total": r["total"],
+                "daily_yes": r["daily_yes"],
+                "daily_no": r["daily_no"],
+                "list_url": f"{request.build_absolute_uri('/').rstrip('/')}"
+                           f"{'/customers/by-location/list/?loc_key='}{quote(key)}",
+            }
+        )
+
+    return render(
+        request,
+        "tiffin_app/customers/by_location.html",
+        {
+            "rows": out,
+            "q": q,
+            "sort": sort,
+        },
+    )
+
+
+@login_required
+def customers_by_location_list(request):
+    tenant = _tenant(request)
+
+    loc_key = (request.GET.get("loc_key") or "").strip().lower()
+    if loc_key is None:
+        loc_key = ""
+
+    q = (request.GET.get("q") or "").strip()
+    daily = (request.GET.get("daily") or "all").strip()  # all | yes | no
+    sort = (request.GET.get("sort") or "name_az").strip()
+
+    qs = (
+        Customer.objects.filter(tenant=tenant)
+        .annotate(loc_key=Lower(Trim(Coalesce("delivery_location", V("")))))
+        .filter(loc_key=loc_key)
+    )
+
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q)
+            | Q(delivery_location__icontains=q)
+            | Q(phone__icontains=q)  # if exists
+        )
+
+    if daily == "yes":
+        qs = qs.filter(daily_customer=True)
+    elif daily == "no":
+        qs = qs.filter(daily_customer=False)
+
+    if sort == "name_za":
+        qs = qs.order_by("-name", "id")
+    elif sort == "daily_yes_first":
+        qs = qs.order_by("-daily_customer", "name", "id")
+    else:  # name_az default
+        qs = qs.order_by("name", "id")
+
+    # display title
+    location_title = "(No Location)" if loc_key == "" else loc_key.upper()
+
+    return render(
+        request,
+        "tiffin_app/customers/by_location_list.html",
+        {
+            "location_title": location_title,
+            "loc_key": loc_key,
+            "customers": qs,
+            "q": q,
+            "daily": daily,
+            "sort": sort,
+            "total": qs.count(),
+        },
+    )
+
 

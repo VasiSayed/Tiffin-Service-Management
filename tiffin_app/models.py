@@ -6,7 +6,13 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.db import models
+from django.db.models import Q
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 
+from django.core.exceptions import ValidationError
+from django.db.models import Q
 
 class Tenant(models.Model):
     name = models.CharField(max_length=200)
@@ -62,6 +68,7 @@ class Customer(models.Model):
     contact_number = models.CharField(max_length=20, blank=True)
     email = models.EmailField(null=True, blank=True)
     delivery_location = models.CharField(max_length=500)
+    daily_customer = models.BooleanField(default=True)  
     address = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -161,33 +168,143 @@ class MealDishPortion(models.Model):
         return f"{self.meal.name}: {self.dish.name}{portion_str} x{self.default_qty}"
 
 
+
+
 class DailyEntry(models.Model):
     MEAL_TYPE_CHOICES = [
         ('LUNCH', 'Lunch'),
         ('DINNER', 'Dinner'),
     ]
-    
+
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='daily_entries')
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='orders')
     entry_date = models.DateField()
     meal_type = models.CharField(max_length=10, choices=MEAL_TYPE_CHOICES)
+
+    menu = models.ForeignKey(
+        "DailyMenu",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="daily_entries",
+    )
+
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         ordering = ['-entry_date', 'customer__name']
         verbose_name_plural = 'Daily Entries'
         unique_together = ['customer', 'entry_date', 'meal_type']
-    
+
     def __str__(self):
         return f"{self.customer.name} - {self.entry_date} ({self.meal_type})"
-    
+
     def calculate_total(self):
         total = sum(meal.total_price for meal in self.order_meals.all())
         self.total_amount = total
         self.save()
         return total
+
+
+class DailyMenu(models.Model):
+    MEAL_TYPE_CHOICES = [
+        ("LUNCH", "Lunch"),
+        ("DINNER", "Dinner"),
+        ("BOTH", "Both"),  # ✅ NEW
+    ]
+
+    tenant = models.ForeignKey("Tenant", on_delete=models.CASCADE, related_name="daily_menus")
+    date = models.DateField()
+    meal_type = models.CharField(max_length=10, choices=MEAL_TYPE_CHOICES)
+
+    # ✅ optional label; allow NULL so multiple unnamed menus are possible
+    menu_name = models.CharField(max_length=80, blank=True, null=True, default=None)
+
+    notes = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "meal_type", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "date", "meal_type", "menu_name"],
+                condition=Q(menu_name__isnull=False) & ~Q(menu_name=""),
+                name="uniq_menu_by_name",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        # normalize blank -> None (so multiple unnamed menus allowed)
+        self.menu_name = (self.menu_name or "").strip() or None
+        self.notes = (self.notes or "").strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        label = self.menu_name or f"Menu #{self.id}"
+        return f"{self.tenant.name} - {self.date} ({self.meal_type}) - {label}"
+
+
+class DailyMenuItem(models.Model):
+    daily_menu = models.ForeignKey(DailyMenu, on_delete=models.CASCADE, related_name="items")
+    dish = models.ForeignKey("Dish", on_delete=models.SET_NULL, null=True, blank=True)
+    dish_name = models.CharField(max_length=200, blank=True)
+    qty = models.IntegerField(default=1, validators=[MinValueValidator(1)])
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["daily_menu", "dish"],
+                condition=Q(dish__isnull=False),
+                name="uniq_menu_item_menu_dish",
+            ),
+            models.UniqueConstraint(
+                fields=["daily_menu", "dish_name"],
+                condition=Q(dish__isnull=True) & ~Q(dish_name=""),
+                name="uniq_menu_item_menu_dishname",
+            ),
+        ]
+
+    def clean(self):
+        dn = (self.dish_name or "").strip()
+        if not self.dish and not dn:
+            raise ValidationError("Select a dish OR enter dish_name.")
+        self.dish_name = dn
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+
+        # auto create dish if dish_name is typed
+        if self.dish is None and self.dish_name:
+            tenant = self.daily_menu.tenant
+            name = self.dish_name.strip()
+
+            existing = Dish.objects.filter(tenant=tenant, name__iexact=name).first()
+            if existing:
+                self.dish = existing
+            else:
+                # ✅ if menu is BOTH, dish meal_category should also support BOTH
+                meal_cat = self.daily_menu.meal_type  # LUNCH/DINNER/BOTH
+
+                self.dish = Dish.objects.create(
+                    tenant=tenant,
+                    name=name,
+                    category="OTHER",
+                    meal_category=meal_cat,  # ✅ now can be BOTH (ensure Dish supports)
+                    food_type="VEG",
+                    availability="AVAILABLE",
+                    is_active=True,
+                )
+
+            self.dish_name = ""
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        label = self.dish.name if self.dish_id else self.dish_name
+        return f"{self.daily_menu.date} {self.daily_menu.meal_type}: {label} x{self.qty}"
 
 
 class OrderMeal(models.Model):

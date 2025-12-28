@@ -90,6 +90,17 @@ urlpatterns = [
 
     path('expenses/api/items/', views.expense_items_api, name='expense_items_api'),
 
+
+
+    path("daily-menu/", views.daily_menu_page, name="daily_menu_page"),
+    path("daily-menu/api/get/", views.daily_menu_get_api, name="daily_menu_get_api"),
+    path("daily-menu/api/save/", views.daily_menu_save_api, name="daily_menu_save_api"),
+    path("daily-menu/list/", views.daily_menu_list, name="daily_menu_list"),
+
+
+    path("customers/by-location/", views.customers_by_location, name="customers_by_location"),
+    path("customers/by-location/list/", views.customers_by_location_list, name="customers_by_location_list"),
+    
     # Reports
     path('reports', views.reports, name='reports'),
 ]

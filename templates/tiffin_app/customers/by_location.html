@@ -1,0 +1,64 @@
+{% extends 'tiffin_app/base.html' %}
+{% block title %}Customers by Location{% endblock %}
+{% block page_title %}Customers by Location{% endblock %}
+
+{% block content %}
+<div class="main-content">
+  <div class="card">
+    <div class="card-body">
+
+      <form method="get" class="filters" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
+        <div class="form-group" style="margin-bottom:0; min-width:260px;">
+          <label class="form-label">Search Location</label>
+          <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="e.g. Sion">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0; min-width:220px;">
+          <label class="form-label">Sort</label>
+          <select name="sort" class="form-control">
+            <option value="count_desc" {% if sort == "count_desc" %}selected{% endif %}>Count (High → Low)</option>
+            <option value="count_asc" {% if sort == "count_asc" %}selected{% endif %}>Count (Low → High)</option>
+            <option value="az" {% if sort == "az" %}selected{% endif %}>Location (A → Z)</option>
+            <option value="za" {% if sort == "za" %}selected{% endif %}>Location (Z → A)</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="height:42px; padding:0 22px;">Apply</button>
+      </form>
+
+      <div class="table-container" style="margin-top:14px;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th>Total</th>
+              <th>Daily Cusomer</th>
+              <th>Daily = No</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                <td style="font-weight:800;">{{ r.display }}</td>
+                <td>{{ r.total }}</td>
+                <td>{{ r.daily_yes }}</td>
+                <td>{{ r.daily_no }}</td>
+                <td>
+                  <a class="btn btn-secondary btn-sm"
+                     href="{% url 'customers_by_location_list' %}?loc_key={{ r.loc_key|urlencode }}">
+                    View Customers
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="text-muted">No customers found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

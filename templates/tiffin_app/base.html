@@ -56,6 +56,22 @@
                             <span class="nav-text">Meals</span>
                         </a>
                     </div>
+                    <!-- <div class="nav-item">
+  <a href="{% url 'daily_menu_page' %}"
+     class="nav-link {% if request.resolver_match.url_name == 'daily_menu_page' %}active{% endif %}"
+     title="Daily Menu">
+    <span class="nav-text">Daily Menu</span>
+  </a>
+</div> -->
+
+<div class="nav-item">
+  <a href="{% url 'daily_menu_list' %}"
+     class="nav-link {% if request.resolver_match.url_name == 'daily_menu_list' %}active{% endif %}"
+     title="Menu List">
+    <span class="nav-text">Daily Menu</span>
+  </a>
+</div>
+
                     <div class="nav-item">
                         <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}" title="Daily Entry">
                             <!-- <span class="nav-icon">📝</span> -->
@@ -97,7 +113,6 @@
                     </div>
                     <div class="nav-item">
                         <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}" title="Print Stickers">
-                            <!-- <span class="nav-icon">🏷️</span> -->
                             <span class="nav-text">Print Stickers</span>
                         </a>
                     </div>
@@ -115,10 +130,16 @@
                     <div class="user-name-sidebar">{{ user.username }}</div>
                     <div class="user-role-sidebar">{{ user.profile.get_role_display }}</div>
                 </div>
-                <a href="{% url 'logout' %}" class="btn btn-secondary w-full btn-sm" title="Logout">
-                    <span class="logout-icon">⎋</span>
-                    <span class="logout-text">Logout</span>
-                </a>
+<button
+  type="button"
+  class="btn btn-secondary w-full btn-sm"
+  title="Logout"
+  onclick="window.location.href='{% url 'logout' %}'"
+>
+  <span class="logout-icon">⎋</span>
+  <span class="logout-text">Logout</span>
+</button>
+
             </div>
         </aside>
         
