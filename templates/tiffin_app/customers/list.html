@@ -10,58 +10,232 @@
 </div>
 {% endblock %}
 
-
 {% block content %}
 <div class="main-content">
-    <div class="card">
-        <div class="card-body">
-            <form method="get" class="filters">
-                <div class="search-box">
-                    <input type="text" name="search" class="form-control" placeholder="Search customers..." value="{{ search }}" onkeyup="filterTable(this, 'customer-table')">
-                </div>
-            </form>
-            
-            <div class="table-container">
-                <table class="table" id="customer-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Location</th>
-                            <th>Active</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for customer in customers %}
-                        <tr>
-                            <td><strong>{{ customer.name }}</strong></td>
-                            <td>{{ customer.contact_number }}</td>
-                            <td>{{ customer.delivery_location }}</td>
-                            <td>
-                                {% if customer.is_active %}
-                                    <span class="badge badge-success">Active</span>
-                                {% else %}
-                                    <span class="badge badge-danger">Inactive</span>
-                                {% endif %}
-                            </td>
-                            <td class="table-actions">
-                                <a href="{% url 'customer_edit' customer.pk %}" class="btn btn-sm btn-secondary">Edit</a>
-                                <form method="post" action="{% url 'customer_delete' customer.pk %}" style="display:inline;" onsubmit="return confirmDelete('Delete {{ customer.name }}?')">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center">No customers found</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+  <div class="card">
+    <div class="card-body">
+
+      <!-- ✅ Filters Toolbar -->
+      <div class="filters" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+        <div class="search-box" style="flex: 1; min-width: 240px;">
+          <input
+            type="text"
+            id="customerSearch"
+            class="form-control"
+            placeholder="Search customers (name / phone / location)..."
+          />
         </div>
+
+        <div style="min-width: 180px;">
+          <select id="typeFilter" class="form-control">
+            <option value="ALL">All (Daily + Occasional)</option>
+            <option value="DAILY">Daily</option>
+            <option value="OCCASIONAL">Occasional</option>
+          </select>
+        </div>
+
+        <div style="min-width: 180px;">
+          <select id="sortBy" class="form-control">
+            <option value="name">Sort: Name</option>
+            <option value="phone">Sort: Phone</option>
+            <option value="location">Sort: Location</option>
+          </select>
+        </div>
+
+        <div style="min-width: 140px;">
+          <select id="sortDir" class="form-control">
+            <option value="asc">Asc</option>
+            <option value="desc">Desc</option>
+          </select>
+        </div>
+
+        <button type="button" id="resetBtn" class="btn btn-secondary">Reset</button>
+      </div>
+
+      <!-- ✅ Counts -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+        <span class="badge badge-info" id="countTotal">Total: 0</span>
+        <span class="badge badge-success" id="countActive">Active: 0</span>
+        <span class="badge badge-danger" id="countInactive">Inactive: 0</span>
+        <span class="badge badge-info" id="countDaily">Daily: 0</span>
+        <span class="badge badge-warning" id="countOccasional">Occasional: 0</span>
+      </div>
+
+      <div class="table-container">
+        <table class="table" id="customer-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Location</th>
+              <th>Type</th>
+              <th>Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+
+          <tbody id="customerTbody">
+            {% for customer in customers %}
+            <tr
+              data-name="{{ customer.name|default:''|lower }}"
+              data-phone="{{ customer.contact_number|default:''|lower }}"
+              data-location="{{ customer.delivery_location|default:''|lower }}"
+              data-type="{% if customer.daily_customer %}DAILY{% else %}OCCASIONAL{% endif %}"
+              data-active="{% if customer.is_active %}1{% else %}0{% endif %}"
+            >
+              <td><strong>{{ customer.name }}</strong></td>
+              <td>{{ customer.contact_number }}</td>
+              <td>{{ customer.delivery_location }}</td>
+
+              <!-- ✅ Daily/Occasional badge -->
+              <td>
+                {% if customer.daily_customer %}
+                  <span class="badge badge-info">Daily</span>
+                {% else %}
+                  <span class="badge badge-warning">Occasional</span>
+                {% endif %}
+              </td>
+
+              <td>
+                {% if customer.is_active %}
+                  <span class="badge badge-success">Active</span>
+                {% else %}
+                  <span class="badge badge-danger">Inactive</span>
+                {% endif %}
+              </td>
+
+              <td class="table-actions">
+                <a href="{% url 'customer_edit' customer.pk %}" class="btn btn-sm btn-secondary">Edit</a>
+                <form method="post" action="{% url 'customer_delete' customer.pk %}" style="display:inline;" onsubmit="return confirmDelete('Delete {{ customer.name }}?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center">No customers found</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
     </div>
+  </div>
 </div>
+
+<!-- ✅ JS: Search + Filter + Sort + Live Counts -->
+<script>
+(function () {
+  const tbody = document.getElementById("customerTbody");
+  if (!tbody) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr")).filter(r => r.querySelectorAll("td").length);
+
+  const $search = document.getElementById("customerSearch");
+  const $typeFilter = document.getElementById("typeFilter");
+  const $sortBy = document.getElementById("sortBy");
+  const $sortDir = document.getElementById("sortDir");
+  const $resetBtn = document.getElementById("resetBtn");
+
+  const $countTotal = document.getElementById("countTotal");
+  const $countActive = document.getElementById("countActive");
+  const $countInactive = document.getElementById("countInactive");
+  const $countDaily = document.getElementById("countDaily");
+  const $countOccasional = document.getElementById("countOccasional");
+
+  const getTextForSearch = (row) => {
+    const n = row.dataset.name || "";
+    const p = row.dataset.phone || "";
+    const l = row.dataset.location || "";
+    return (n + " " + p + " " + l).toLowerCase();
+  };
+
+  const apply = () => {
+    const q = ($search.value || "").trim().toLowerCase();
+    const tf = $typeFilter.value; // ALL / DAILY / OCCASIONAL
+
+    // show/hide
+    let visible = [];
+    for (const r of rows) {
+      const type = r.dataset.type || "OCCASIONAL";
+      const matchType = (tf === "ALL") ? true : (type === tf);
+      const matchSearch = !q ? true : getTextForSearch(r).includes(q);
+
+      const ok = matchType && matchSearch;
+      r.style.display = ok ? "" : "none";
+      if (ok) visible.push(r);
+    }
+
+    // sort only visible rows (DOM reorder)
+    const by = $sortBy.value; // name/phone/location
+    const dir = $sortDir.value; // asc/desc
+    const mult = dir === "desc" ? -1 : 1;
+
+    visible.sort((a, b) => {
+      const va =
+        (by === "name") ? (a.dataset.name || "") :
+        (by === "phone") ? (a.dataset.phone || "") :
+        (a.dataset.location || "");
+      const vb =
+        (by === "name") ? (b.dataset.name || "") :
+        (by === "phone") ? (b.dataset.phone || "") :
+        (b.dataset.location || "");
+      return va.localeCompare(vb) * mult;
+    });
+
+    // re-append in sorted order (only visible first, then hidden)
+    const hidden = rows.filter(r => r.style.display === "none");
+    tbody.innerHTML = "";
+    visible.forEach(r => tbody.appendChild(r));
+    hidden.forEach(r => tbody.appendChild(r));
+
+    // counts (based on visible)
+    let total = visible.length;
+    let daily = 0, occasional = 0, active = 0, inactive = 0;
+
+    for (const r of visible) {
+      const type = r.dataset.type;
+      const isActive = r.dataset.active === "1";
+      if (type === "DAILY") daily++;
+      else occasional++;
+      if (isActive) active++;
+      else inactive++;
+    }
+
+    $countTotal.textContent = `Total: ${total}`;
+    $countDaily.textContent = `Daily: ${daily}`;
+    $countOccasional.textContent = `Occasional: ${occasional}`;
+    $countActive.textContent = `Active: ${active}`;
+    $countInactive.textContent = `Inactive: ${inactive}`;
+  };
+
+  const debounce = (fn, ms) => {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  };
+
+  const applyDebounced = debounce(apply, 150);
+
+  $search.addEventListener("input", applyDebounced);
+  $typeFilter.addEventListener("change", apply);
+  $sortBy.addEventListener("change", apply);
+  $sortDir.addEventListener("change", apply);
+
+  $resetBtn.addEventListener("click", () => {
+    $search.value = "";
+    $typeFilter.value = "ALL";
+    $sortBy.value = "name";
+    $sortDir.value = "asc";
+    apply();
+  });
+
+  // initial run
+  apply();
+})();
+</script>
 {% endblock %}

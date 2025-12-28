@@ -5,44 +5,327 @@
 {% block top_actions %}
 <a href="{% url 'daily_entry_add' %}" class="btn btn-primary">+ Create Order</a>
 {% endblock %}
+
 {% block content %}
 <div class="main-content">
-    
-        <div class="card">
-            <div class="card-body">
-                <form method="get" class="filters">
-                    <div class="form-group">
-                        <label class="form-label">Date</label>
-                        <input type="date" name="date" class="form-control" value="{{ entry_date }}" onchange="this.form.submit()">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Meal Type</label>
-                        <div class="toggle-group">
-                            <button type="button" class="toggle-btn {% if meal_type == 'LUNCH' %}active{% endif %}" onclick="window.location='?date={{ entry_date }}&meal_type=LUNCH'">Lunch</button>
-                            <button type="button" class="toggle-btn {% if meal_type == 'DINNER' %}active{% endif %}" onclick="window.location='?date={{ entry_date }}&meal_type=DINNER'">Dinner</button>
-                        </div>
-                    </div>
-                </form>
-                <table class="table">
-                    <thead>
-                        <tr><th>Customer</th><th>Delivery Location</th><th>Total Amount</th><th>Actions</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for entry in entries %}
-                        <tr>
-                            <td><strong>{{ entry.customer.name }}</strong></td>
-                            <td>{{ entry.customer.delivery_location }}</td>
-                            <td>₹{{ entry.total_amount }}</td>
-                            <td>
-                                <a href="{% url 'daily_entry_detail' entry.pk %}" class="btn btn-sm btn-primary">Open</a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="4" class="text-center">No orders for this date and meal type</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+  <div class="card">
+    <div class="card-body">
+
+      <!-- ✅ Filters Wrapper (clean toolbar style) -->
+      <div class="filters-panel daily-entry-filters">
+
+        <!-- ✅ TOP TOOLBAR (Date + Meal + Search + Location + Reset) -->
+        <div class="daily-entry-filters__top">
+
+          <!-- server-side: Date (keeps meal_type also) -->
+          <form method="get" id="serverFilters" class="daily-entry-filters__date">
+            <div class="form-group">
+              <label class="form-label">Date</label>
+              <input
+                type="date"
+                name="date"
+                id="entryDate"
+                class="form-control"
+                value="{{ entry_date }}"
+                onchange="this.form.submit()"
+              >
+              <!-- ✅ preserve selected meal type on date change -->
+              <input type="hidden" name="meal_type" value="{{ meal_type }}">
             </div>
+          </form>
+
+          <!-- meal type -->
+          <div class="form-group daily-entry-filters__meal">
+            <label class="form-label">Meal Type</label>
+            <div class="toggle-group w-full daily-entry-toggle">
+              <button
+                type="button"
+                class="toggle-btn {% if meal_type == 'LUNCH' %}active{% endif %}"
+                onclick="window.location='?date={{ entry_date }}&meal_type=LUNCH'"
+              >Lunch</button>
+
+              <button
+                type="button"
+                class="toggle-btn {% if meal_type == 'DINNER' %}active{% endif %}"
+                onclick="window.location='?date={{ entry_date }}&meal_type=DINNER'"
+              >Dinner</button>
+            </div>
+          </div>
+
+          <!-- search -->
+          <div class="form-group daily-entry-filters__search">
+            <label class="form-label">Search</label>
+            <input
+              type="text"
+              id="q"
+              class="form-control"
+              placeholder="Search customer / phone / location..."
+            />
+          </div>
+
+          <!-- location -->
+          <div class="form-group daily-entry-filters__location">
+            <label class="form-label">Location</label>
+            <select id="loc" class="form-control">
+              <option value="ALL">All Locations</option>
+            </select>
+          </div>
+
+          <!-- reset -->
+          <div class="form-group daily-entry-filters__reset">
+            <label class="form-label">&nbsp;</label>
+            <button type="button" class="btn btn-secondary w-full" id="resetBtn">Reset</button>
+          </div>
         </div>
+
+        <!-- ✅ SECOND ROW (Amounts + Sorting) -->
+        <div class="daily-entry-filters__bottom">
+          <div class="form-group">
+            <label class="form-label">Min Amount</label>
+            <input id="minAmt" type="number" class="form-control" placeholder="0" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Max Amount</label>
+            <input id="maxAmt" type="number" class="form-control" placeholder="99999" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Sort</label>
+            <select id="sortBy" class="form-control">
+              <option value="customer">Customer</option>
+              <option value="location">Location</option>
+              <option value="amount">Amount</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Order</label>
+            <select id="sortDir" class="form-control">
+              <option value="asc">Asc</option>
+              <option value="desc">Desc</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ✅ Stats -->
+        <div class="filter-stats daily-entry-filters__stats">
+          <span class="badge badge-info" id="statCount">Orders: 0</span>
+          <span class="badge badge-success" id="statTotal">Total: ₹0</span>
+        </div>
+      </div>
+
+      <!-- ✅ Table -->
+      <div class="table-container" style="margin-top:12px;">
+        <table class="table" id="entriesTable">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Delivery Location</th>
+              <th>Total Amount</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+
+          <tbody id="entriesBody">
+            {% for entry in entries %}
+            <tr
+              data-customer="{{ entry.customer.name|default:''|lower }}"
+              data-phone="{{ entry.customer.contact_number|default:''|lower }}"
+              data-location="{{ entry.customer.delivery_location|default:'' }}"
+              data-location-l="{{ entry.customer.delivery_location|default:''|lower }}"
+              data-amount="{{ entry.total_amount|default:0 }}"
+            >
+              <td><strong>{{ entry.customer.name }}</strong></td>
+              <td>{{ entry.customer.delivery_location }}</td>
+              <td>₹{{ entry.total_amount }}</td>
+              <td>
+                <a href="{% url 'daily_entry_detail' entry.pk %}" class="btn btn-sm btn-primary">Open</a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center">No orders for this date and meal type</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
     </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ✅ prevent future date selection
+  const entryDate = document.getElementById("entryDate");
+  if (entryDate) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const maxDate = `${yyyy}-${mm}-${dd}`;
+    entryDate.setAttribute("max", maxDate);
+
+    if (entryDate.value && entryDate.value > maxDate) {
+      entryDate.value = maxDate;
+      document.getElementById("serverFilters")?.submit();
+    }
+  }
+
+  const tbody = document.getElementById("entriesBody");
+  if (!tbody) return;
+
+  // ✅ IMPORTANT:
+  // Only real order rows have data-amount attribute
+  const allRows = Array.from(tbody.querySelectorAll("tr"));
+  const dataRows = allRows.filter((r) => r.hasAttribute("data-amount"));
+
+  // ✅ Create / reuse a "no results" row
+  let noResultsRow = document.getElementById("noResultsRow");
+  if (!noResultsRow) {
+    noResultsRow = document.createElement("tr");
+    noResultsRow.id = "noResultsRow";
+    noResultsRow.innerHTML = `<td colspan="4" class="text-center">No matching orders</td>`;
+    noResultsRow.style.display = "none";
+    tbody.appendChild(noResultsRow);
+  }
+
+  const $q = document.getElementById("q");
+  const $loc = document.getElementById("loc");
+  const $minAmt = document.getElementById("minAmt");
+  const $maxAmt = document.getElementById("maxAmt");
+  const $sortBy = document.getElementById("sortBy");
+  const $sortDir = document.getElementById("sortDir");
+  const $resetBtn = document.getElementById("resetBtn");
+  const $statCount = document.getElementById("statCount");
+  const $statTotal = document.getElementById("statTotal");
+
+  // build location dropdown from data rows only
+  const locSet = new Set();
+  dataRows.forEach((r) => {
+    const loc = (r.dataset.location || "").trim();
+    if (loc) locSet.add(loc);
+  });
+
+  // clear old generated options except ALL
+  const keepFirst = $loc.querySelector("option[value='ALL']");
+  $loc.innerHTML = "";
+  $loc.appendChild(keepFirst);
+
+  Array.from(locSet)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((l) => {
+      const opt = document.createElement("option");
+      opt.value = l;
+      opt.textContent = l;
+      $loc.appendChild(opt);
+    });
+
+  const parseAmt = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const fmtINR = (n) => {
+    try { return Number(n || 0).toLocaleString("en-IN"); }
+    catch { return String(n || 0); }
+  };
+
+  const getSearchText = (r) => {
+    const c = r.dataset.customer || "";
+    const p = r.dataset.phone || "";
+    const l = r.dataset.locationL || "";
+    return (c + " " + p + " " + l).toLowerCase();
+  };
+
+  const apply = () => {
+    // If no server entries at all
+    if (dataRows.length === 0) {
+      $statCount.textContent = `Orders: 0`;
+      $statTotal.textContent = `Total: ₹0`;
+      noResultsRow.style.display = "";
+      return;
+    }
+
+    const q = ($q.value || "").trim().toLowerCase();
+    const loc = $loc.value || "ALL";
+    const minAmt = $minAmt.value ? Number($minAmt.value) : null;
+    const maxAmt = $maxAmt.value ? Number($maxAmt.value) : null;
+
+    let visible = [];
+
+    for (const r of dataRows) {
+      const amt = parseAmt(r.dataset.amount);
+      const matchQ = !q ? true : getSearchText(r).includes(q);
+      const matchLoc = (loc === "ALL") ? true : ((r.dataset.location || "") === loc);
+
+      let matchAmt = true;
+      if (minAmt !== null && Number.isFinite(minAmt)) matchAmt = matchAmt && (amt >= minAmt);
+      if (maxAmt !== null && Number.isFinite(maxAmt)) matchAmt = matchAmt && (amt <= maxAmt);
+
+      const ok = matchQ && matchLoc && matchAmt;
+      r.style.display = ok ? "" : "none";
+      if (ok) visible.push(r);
+    }
+
+    // sort visible
+    const by = $sortBy.value;
+    const dir = $sortDir.value === "desc" ? -1 : 1;
+
+    visible.sort((a, b) => {
+      if (by === "amount") return (parseAmt(a.dataset.amount) - parseAmt(b.dataset.amount)) * dir;
+      const va = (by === "location") ? (a.dataset.locationL || "") : (a.dataset.customer || "");
+      const vb = (by === "location") ? (b.dataset.locationL || "") : (b.dataset.customer || "");
+      return va.localeCompare(vb) * dir;
+    });
+
+    // reorder DOM (only real rows)
+    const hidden = dataRows.filter((r) => r.style.display === "none");
+    tbody.innerHTML = "";
+    visible.forEach((r) => tbody.appendChild(r));
+    hidden.forEach((r) => tbody.appendChild(r));
+
+    // show/hide noResults row
+    noResultsRow.style.display = visible.length === 0 ? "" : "none";
+    tbody.appendChild(noResultsRow);
+
+    // stats
+    const totalOrders = visible.length;
+    const totalAmt = visible.reduce((sum, r) => sum + parseAmt(r.dataset.amount), 0);
+
+    $statCount.textContent = `Orders: ${totalOrders}`;
+    $statTotal.textContent = `Total: ₹${fmtINR(totalAmt)}`;
+  };
+
+  const debounce = (fn, ms) => {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  };
+
+  const applyDebounced = debounce(apply, 150);
+
+  $q.addEventListener("input", applyDebounced);
+  $loc.addEventListener("change", apply);
+  $minAmt.addEventListener("input", applyDebounced);
+  $maxAmt.addEventListener("input", applyDebounced);
+  $sortBy.addEventListener("change", apply);
+  $sortDir.addEventListener("change", apply);
+
+  $resetBtn.addEventListener("click", () => {
+    $q.value = "";
+    $loc.value = "ALL";
+    $minAmt.value = "";
+    $maxAmt.value = "";
+    $sortBy.value = "customer";
+    $sortDir.value = "asc";
+    apply();
+  });
+
+  apply();
+})();
+</script>
+
 {% endblock %}

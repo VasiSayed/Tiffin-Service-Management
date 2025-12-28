@@ -90,6 +90,9 @@ from datetime import date
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.db.models import Prefetch
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.shortcuts import render
 from .models import DailyEntry, OrderMealCustom  
 from .models import Customer, DailyEntry, DailyMenu, Dish, Meal
 from django.contrib import messages
@@ -182,14 +185,15 @@ def dashboard(request):
     return render(request, "tiffin_app/dashboard.html", context)
 
 
-# ---------------- customers ----------------
+
 @login_required
 @require_admin
 def customer_list(request):
     tenant = _tenant(request)
-    search = request.GET.get("search", "")
+    search = request.GET.get("search", "").strip()
 
     customers = Customer.objects.filter(tenant=tenant)
+
     if search:
         customers = customers.filter(
             Q(name__icontains=search)
@@ -197,7 +201,14 @@ def customer_list(request):
             | Q(delivery_location__icontains=search)
         )
 
-    return render(request, "tiffin_app/customers/list.html", {"customers": customers, "search": search})
+    customers = customers.order_by("name")
+
+    return render(
+        request,
+        "tiffin_app/customers/list.html",
+        {"customers": customers, "search": search},
+    )
+
 
 
 @login_required
@@ -211,6 +222,7 @@ def customer_add(request):
             contact_number=request.POST.get("contact_number", ""),
             email=request.POST.get("email") or None,
             delivery_location=request.POST["delivery_location"],
+            daily_customer=request.POST.get("daily_customer") == "on",  # ✅ ADD
             address=request.POST.get("address", ""),
             is_active=request.POST.get("is_active") == "on",
         )
@@ -230,6 +242,7 @@ def customer_edit(request, pk):
         customer.contact_number = request.POST.get("contact_number", "")
         customer.email = request.POST.get("email") or None
         customer.delivery_location = request.POST["delivery_location"]
+        customer.daily_customer = request.POST.get("daily_customer") == "on"  # ✅ ADD
         customer.address = request.POST.get("address", "")
         customer.is_active = request.POST.get("is_active") == "on"
         customer.save()
@@ -628,11 +641,7 @@ def daily_entry_add(request):
             url = f"{url}?menu_id={menu_id}"
         return redirect(url)
 
-    customers = Customer.objects.filter(tenant=tenant, is_active=True)
-
-    # ✅ menus for selected date + meal_type
-    # LUNCH -> show LUNCH + BOTH menus
-    # DINNER -> show DINNER + BOTH menus
+    customers = Customer.objects.filter(tenant=tenant, is_active=True).order_by("name")
     allowed_types = [meal_type, "BOTH"] if meal_type in ("LUNCH", "DINNER") else ["BOTH"]
 
     menus_qs = (
@@ -949,11 +958,9 @@ def daily_entry_bulk_create(request):
 
 from datetime import date
 from collections import OrderedDict
-
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Q
 from django.shortcuts import render
-
 from .models import DailyEntry, OrderMealCustom, DailyMenu, DailyMenuItem  # ✅ use your actual paths
 
 

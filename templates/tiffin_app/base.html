@@ -147,7 +147,7 @@
         <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle Menu">
             <span id="toggle-icon">◀</span>
         </button>
-        
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileMenu()"></div>
         <!-- Main Content Wrapper -->
         <div class="main-wrapper" id="mainWrapper">
             <div class="top-bar no-print">
@@ -163,50 +163,112 @@
         </div>
         
         <!-- Mobile Menu Button -->
-        <button class="mobile-menu-btn" onclick="toggleMobileMenu()" style="display: none;">☰</button>
+<button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+
     {% else %}
         {% include 'tiffin_app/partials/messages.html' %}
         {% block content_unauthenticated %}{% endblock %}
     {% endif %}
     
     <script src="{% static 'tiffin_app/js/main.js' %}"></script>
-    <script>
-        function toggleMobileMenu() {
-            document.getElementById('sidebar').classList.toggle('mobile-open');
-        }
-        
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainWrapper = document.getElementById('mainWrapper');
-            const toggleIcon = document.getElementById('toggle-icon');
-            
-            sidebar.classList.toggle('collapsed');
-            mainWrapper.classList.toggle('sidebar-collapsed');
-            
-            // Change icon
-            if (sidebar.classList.contains('collapsed')) {
-                toggleIcon.textContent = '▶';
-                localStorage.setItem('sidebarCollapsed', 'true');
-            } else {
-                toggleIcon.textContent = '◀';
-                localStorage.setItem('sidebarCollapsed', 'false');
-            }
-        }
-        
-        // Remember sidebar state
-        document.addEventListener('DOMContentLoaded', function() {
-            const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-            if (sidebarCollapsed) {
-                const sidebar = document.getElementById('sidebar');
-                const mainWrapper = document.getElementById('mainWrapper');
-                const toggleIcon = document.getElementById('toggle-icon');
-                
-                sidebar.classList.add('collapsed');
-                mainWrapper.classList.add('sidebar-collapsed');
-                toggleIcon.textContent = '▶';
-            }
-        });
-    </script>
+<script>
+  function _isMobile() {
+    return window.matchMedia("(max-width: 768px)").matches;
+  }
+
+  function openMobileMenu() {
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebarOverlay");
+    if (!sidebar) return;
+
+    // desktop collapse state remove in mobile
+    sidebar.classList.remove("collapsed");
+    document.getElementById("mainWrapper")?.classList.remove("sidebar-collapsed");
+
+    sidebar.classList.add("mobile-open");
+    overlay?.classList.add("show");
+    document.body.classList.add("no-scroll");
+  }
+
+  function closeMobileMenu() {
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebarOverlay");
+    if (!sidebar) return;
+
+    sidebar.classList.remove("mobile-open");
+    overlay?.classList.remove("show");
+    document.body.classList.remove("no-scroll");
+  }
+
+  function toggleMobileMenu() {
+    const sidebar = document.getElementById("sidebar");
+    if (!sidebar) return;
+
+    if (sidebar.classList.contains("mobile-open")) closeMobileMenu();
+    else openMobileMenu();
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const mainWrapper = document.getElementById("mainWrapper");
+    const toggleIcon = document.getElementById("toggle-icon");
+    if (!sidebar) return;
+
+    // ✅ Mobile: drawer open/close
+    if (_isMobile()) {
+      toggleMobileMenu();
+      return;
+    }
+
+    // ✅ Desktop: collapse behavior same as yours
+    sidebar.classList.toggle("collapsed");
+    mainWrapper.classList.toggle("sidebar-collapsed");
+
+    if (sidebar.classList.contains("collapsed")) {
+      toggleIcon.textContent = "▶";
+      localStorage.setItem("sidebarCollapsed", "true");
+    } else {
+      toggleIcon.textContent = "◀";
+      localStorage.setItem("sidebarCollapsed", "false");
+    }
+  }
+
+  // ✅ Remember desktop collapse state ONLY on desktop
+  document.addEventListener("DOMContentLoaded", function () {
+    // always close mobile on load
+    closeMobileMenu();
+
+    if (_isMobile()) return;
+
+    const sidebarCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
+    if (sidebarCollapsed) {
+      const sidebar = document.getElementById("sidebar");
+      const mainWrapper = document.getElementById("mainWrapper");
+      const toggleIcon = document.getElementById("toggle-icon");
+
+      sidebar.classList.add("collapsed");
+      mainWrapper.classList.add("sidebar-collapsed");
+      toggleIcon.textContent = "▶";
+    }
+  });
+
+  // ✅ close on clicking any nav link (mobile)
+  document.addEventListener("click", function (e) {
+    const link = e.target.closest("a.nav-link");
+    if (link && _isMobile()) closeMobileMenu();
+  });
+
+  // ✅ ESC closes drawer
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeMobileMenu();
+  });
+
+  // ✅ leaving mobile → remove overlay state
+  window.addEventListener("resize", function () {
+    if (!_isMobile()) closeMobileMenu();
+  });
+</script>
+
     
     {% if user.is_authenticated %}
     <!-- AI Chatbot Widget with Tenant Colors -->
