@@ -1,50 +1,136 @@
 {% extends 'tiffin_app/base.html' %}
 {% block title %}Add Payment{% endblock %}
 {% block page_title %}Add Payment{% endblock %}
+
 {% block content %}
 <div class="main-content">
-    
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="form-group">
-                        <label class="form-label">Customer *</label>
-                        <select name="customer" class="form-control" required>
-                            <option value="">Select Customer</option>
-                            {% for customer in customers %}
-                            <option value="{{ customer.pk }}">{{ customer.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Payment Date *</label>
-                            <input type="date" name="payment_date" class="form-control" value="{{ today }}" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Amount *</label>
-                            <input type="number" step="0.01" name="amount" class="form-control" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Method *</label>
-                        <select name="method" class="form-control" required>
-                            <option value="CASH">Cash</option>
-                            <option value="UPI">UPI</option>
-                            <option value="BANK">Bank Transfer</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Note</label>
-                        <textarea name="note" class="form-control"></textarea>
-                    </div>
-                    <div class="flex gap-2">
-                        <button type="submit" class="btn btn-primary">Save</button>
-                        <a href="{% url 'payments' %}" class="btn btn-secondary">Cancel</a>
-                    </div>
-                </form>
-            </div>
+  <div class="card">
+    <div class="card-body">
+      <form method="post" id="paymentForm">
+        {% csrf_token %}
+
+        <!-- ✅ Customer Search + Select (same as Create Order) -->
+        <div class="form-group">
+          <label class="form-label">Customer *</label>
+
+          <!-- search box -->
+          <input
+            type="text"
+            id="customer-search"
+            class="form-control"
+            placeholder="Search customer name / location / meal..."
+            autocomplete="off"
+            style="margin-bottom:10px;"
+          />
+
+          <!-- actual select used for submit -->
+          <select name="customer" class="form-control" required id="customer-select">
+            <option value="">Select Customer</option>
+
+            {% for customer in customers %}
+              <option value="{{ customer.pk }}">
+                {{ customer.name }}
+                ({% if customer.daily_customer %}Regular{% else %}Occasional{% endif %})
+                - {{ customer.meal_preference|default:"BOTH" }}
+                - {{ customer.delivery_location|default:"-" }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <div class="form-help" id="customer-help" style="margin-top:6px;">
+            Tip: Type to filter customers quickly.
+          </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Payment Date *</label>
+            <input type="date" name="payment_date" class="form-control" value="{{ today }}" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Amount *</label>
+            <input type="number" step="0.01" name="amount" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Method *</label>
+          <select name="method" class="form-control" required>
+            <option value="CASH">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="BANK">Bank Transfer</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Note</label>
+          <textarea name="note" class="form-control"></textarea>
+        </div>
+
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="{% url 'payments' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
     </div>
+  </div>
+</div>
+
+<script>
+  // ✅ Searchable customer dropdown (no library)
+  (function () {
+    const searchEl = document.getElementById("customer-search");
+    const selectEl = document.getElementById("customer-select");
+    const helpEl = document.getElementById("customer-help");
+    if (!searchEl || !selectEl) return;
+
+    const placeholder = selectEl.querySelector('option[value=""]');
+    const original = Array.from(selectEl.querySelectorAll("option"))
+      .filter(o => o.value); // only real customers
+
+    const data = original.map(o => ({
+      value: o.value,
+      text: o.textContent.trim(),
+      key: o.textContent.trim().toLowerCase()
+    }));
+
+    const rebuild = (q) => {
+      const query = (q || "").trim().toLowerCase();
+      const prev = selectEl.value;
+
+      // clear and re-add placeholder
+      selectEl.innerHTML = "";
+      if (placeholder) selectEl.appendChild(placeholder);
+
+      const filtered = !query ? data : data.filter(x => x.key.includes(query));
+
+      for (const x of filtered) {
+        const opt = document.createElement("option");
+        opt.value = x.value;
+        opt.textContent = x.text;
+        selectEl.appendChild(opt);
+      }
+
+      // restore selection if still present
+      const stillExists = Array.from(selectEl.options).some(o => o.value === prev);
+      selectEl.value = stillExists ? prev : "";
+
+      if (helpEl) helpEl.textContent = `Showing ${filtered.length} customer(s)`;
+    };
+
+    const debounce = (fn, ms) => {
+      let t;
+      return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), ms);
+      };
+    };
+
+    searchEl.addEventListener("input", debounce(() => rebuild(searchEl.value), 120));
+
+    // initial
+    rebuild("");
+  })();
+</script>
 {% endblock %}

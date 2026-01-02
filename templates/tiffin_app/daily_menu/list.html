@@ -4,7 +4,7 @@
 
 {% block top_actions %}
   <a class="btn btn-primary"
-     href="{% url 'daily_menu_page' %}?date={{ selected_date }}&meal_type={{ selected_meal_type|default:'LUNCH' }}&new=1">
+     href="{% url 'daily_menu_page' %}?date={{ selected_start_date|default:today }}&meal_type={{ selected_meal_type|default:'LUNCH' }}&new=1">
     + Create Menu
   </a>
 {% endblock %}
@@ -14,49 +14,72 @@
   <div class="card">
     <div class="card-body">
 
-      <!-- ✅ Filters in ONE LINE (same structure as Daily Entry) -->
-      <form method="get" class="filters" id="filterForm">
+      <!-- ✅ Filters ONE LINE -->
+      <form method="get" class="menu-filters" id="filterForm">
+        <!-- Start Date -->
         <div class="form-group">
-          <label class="form-label">Date</label>
+          <label class="form-label">Start Date</label>
           <input
             type="date"
-            name="date"
+            name="start_date"
             class="form-control"
-            value="{{ selected_date }}"
-            onchange="this.form.submit()"
+            value="{{ selected_start_date|default:today }}"
           >
         </div>
 
+        <!-- End Date -->
         <div class="form-group">
+          <label class="form-label">End Date</label>
+          <input
+            type="date"
+            name="end_date"
+            class="form-control"
+            value="{{ selected_end_date|default:'' }}"
+          >
+        </div>
+
+        <!-- Menu Name Search -->
+        <div class="form-group menu-search">
+          <label class="form-label">Menu</label>
+          <input
+            type="text"
+            name="q"
+            class="form-control"
+            placeholder="Search menu name..."
+            value="{{ q|default:'' }}"
+          >
+        </div>
+
+        <!-- Meal Type (hidden + toggle buttons) -->
+        <input type="hidden" name="meal_type" id="mealTypeInput" value="{{ selected_meal_type|default:'' }}"/>
+
+        <div class="form-group meal-toggle">
           <label class="form-label">Meal Type</label>
-          <div class="toggle-group">
-            <button
-              type="button"
+          <div class="toggle-group" id="mealToggleGroup">
+            <button type="button"
               class="toggle-btn {% if selected_meal_type == 'LUNCH' %}active{% endif %}"
-              onclick="window.location='?date={{ selected_date }}&meal_type=LUNCH'">
-              Lunch
-            </button>
+              data-value="LUNCH">Lunch</button>
 
-            <button
-              type="button"
+            <button type="button"
               class="toggle-btn {% if selected_meal_type == 'DINNER' %}active{% endif %}"
-              onclick="window.location='?date={{ selected_date }}&meal_type=DINNER'">
-              Dinner
-            </button>
+              data-value="DINNER">Dinner</button>
 
-            <button
-              type="button"
+            <button type="button"
               class="toggle-btn {% if selected_meal_type == 'BOTH' %}active{% endif %}"
-              onclick="window.location='?date={{ selected_date }}&meal_type=BOTH'">
-              Both
-            </button>
+              data-value="BOTH">Both</button>
 
-            <button
-              type="button"
-              class="toggle-btn {% if selected_meal_type != 'LUNCH' and selected_meal_type != 'DINNER' and selected_meal_type != 'BOTH' %}active{% endif %}"
-              onclick="window.location='?date={{ selected_date }}'">
-              All
-            </button>
+            <button type="button"
+              class="toggle-btn {% if not selected_meal_type %}active{% endif %}"
+              data-value="">All</button>
+          </div>
+        </div>
+
+        <!-- Apply + Reset -->
+        <div class="form-group actions">
+          <label class="form-label" style="opacity:0;">Actions</label>
+          <div style="display:flex; gap:10px;">
+            <button type="submit" class="btn btn-primary">Apply</button>
+            <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
           </div>
         </div>
       </form>
@@ -79,9 +102,19 @@
             <tbody>
               {% for m in menus %}
               <tr>
-                <td>{{ m.date }}</td>
-                <td>{{ m.meal_type }}</td>
-                <td>{{ m.menu_name }}</td>
+                <td>{{ m.date|date:'Y-m-d' }}</td>
+
+                <td>
+                  {% if m.meal_type == "LUNCH" %}
+                    <span class="badge badge-info">Lunch</span>
+                  {% elif m.meal_type == "DINNER" %}
+                    <span class="badge badge-warning">Dinner</span>
+                  {% else %}
+                    <span class="badge badge-success">Both</span>
+                  {% endif %}
+                </td>
+
+                <td><strong>{{ m.menu_name }}</strong></td>
                 <td>{{ m.items_text }}</td>
                 <td>{{ m.notes }}</td>
                 <td>
@@ -100,7 +133,7 @@
           No menu found for selected filter.
           <div style="margin-top:8px;">
             <a class="btn btn-primary"
-               href="{% url 'daily_menu_page' %}?date={{ selected_date }}&meal_type={{ selected_meal_type|default:'LUNCH' }}&new=1">
+               href="{% url 'daily_menu_page' %}?date={{ selected_start_date|default:today }}&meal_type={{ selected_meal_type|default:'LUNCH' }}&new=1">
               Create Menu
             </a>
           </div>
@@ -110,4 +143,77 @@
     </div>
   </div>
 </div>
+
+<style>
+  .menu-filters{
+    display:flex;
+    gap:12px;
+    align-items:flex-end;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    padding-bottom:6px;
+  }
+  .menu-filters .form-group{ flex:0 0 auto; min-width:170px; }
+  .menu-filters .menu-search{ min-width:240px; flex:1 1 260px; }
+  .menu-filters .meal-toggle{ min-width:320px; }
+  .menu-filters .actions{ min-width:200px; }
+
+  .toggle-group{ display:flex; gap:8px; flex-wrap:nowrap; }
+  .toggle-btn{
+    border:1px solid #e5e7eb;
+    background:#fff;
+    padding:8px 12px;
+    border-radius:10px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .toggle-btn.active{
+    border-color:#2563eb;
+    color:#2563eb;
+    font-weight:600;
+  }
+</style>
+
+<script>
+(function(){
+  const mealInput = document.getElementById("mealTypeInput");
+  const group = document.getElementById("mealToggleGroup");
+  const resetBtn = document.getElementById("resetBtn");
+
+  if (group) {
+    group.addEventListener("click", (e) => {
+      const btn = e.target.closest("button.toggle-btn");
+      if (!btn) return;
+
+      const val = btn.getAttribute("data-value");
+      mealInput.value = val;
+
+      // active class update
+      group.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      // reset to TODAY start_date, clear end_date, clear q, meal_type = All
+      const today = "{{ today }}";
+      document.querySelector("input[name='start_date']").value = today;
+      document.querySelector("input[name='end_date']").value = "";
+      const q = document.querySelector("input[name='q']");
+      if (q) q.value = "";
+
+      mealInput.value = "";
+      if (group) {
+        group.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+        // make All active
+        const allBtn = group.querySelector(".toggle-btn[data-value='']");
+        if (allBtn) allBtn.classList.add("active");
+      }
+
+      document.getElementById("filterForm").submit();
+    });
+  }
+})();
+</script>
 {% endblock %}

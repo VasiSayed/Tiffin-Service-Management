@@ -9,14 +9,11 @@
 {% block extra_css %}
 <style>
 /* =========================================================
-   Sticker Page (namespaced) - avoids conflicts with style.css
+   Sticker Page (namespaced)
 ========================================================= */
+.sticker-page{ width: 100%; }
 
-.sticker-page{
-  width: 100%;
-}
-
-/* ✅ SCREEN: full width, NO A4 white preview box */
+/* ✅ SCREEN */
 @media screen{
   .sticker-page .print-page{
     width: 100%;
@@ -33,25 +30,20 @@
 @media print{
   @page { size: A4; margin: 5mm; }
   .no-print { display: none !important; }
-
   .sticker-page .print-page { page-break-after: always; break-after: page; }
   .sticker-page .print-page:last-child { page-break-after: auto; break-after: auto; }
-
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .main-content { padding: 0 !important; }
   .card { box-shadow: none !important; border: none !important; }
 }
 
 /* Layout vars */
-.sticker-page{
-  --sticker-size: 39mm;
-  --sticker-gap: 1mm;
-}
+.sticker-page{ --sticker-size: 39mm; --sticker-gap: 1mm; }
 .sticker-page .layout-35{ --sticker-size: 39mm; --sticker-gap: 1mm; }
 .sticker-page .layout-24{ --sticker-size: 48mm; --sticker-gap: 2mm; }
 .sticker-page .layout-12{ --sticker-size: 65mm; --sticker-gap: 3mm; }
 
-/* ✅ FULL WIDTH wrapper (no card look) */
+/* Wrapper */
 .sticker-page .stickers-wrap{
   width: 100%;
   max-width: none !important;
@@ -63,7 +55,7 @@
   border-radius: 0 !important;
 }
 
-/* Grid base */
+/* Grid */
 .sticker-page .stickers-grid{
   width: 100%;
   display: grid;
@@ -74,33 +66,28 @@
   align-content: start;
 }
 
-/* Layout grids (screen + print BOTH) */
 .sticker-page .stickers-grid.per-35{
   grid-template-columns: repeat(5, var(--sticker-size)) !important;
   grid-auto-rows: var(--sticker-size) !important;
   gap: var(--sticker-gap) !important;
-  justify-content: start !important;
-  align-content: start !important;
   place-content: start !important;
 }
 .sticker-page .stickers-grid.per-24{
   grid-template-columns: repeat(4, var(--sticker-size)) !important;
   grid-auto-rows: var(--sticker-size) !important;
   gap: var(--sticker-gap) !important;
-  justify-content: start !important;
-  align-content: start !important;
   place-content: start !important;
 }
 .sticker-page .stickers-grid.per-12{
   grid-template-columns: repeat(3, var(--sticker-size)) !important;
   grid-auto-rows: var(--sticker-size) !important;
   gap: var(--sticker-gap) !important;
-  justify-content: start !important;
-  align-content: start !important;
   place-content: start !important;
 }
 
-/* Sticker base */
+/* =========================================================
+   Sticker (better use of empty space)
+========================================================= */
 .sticker-page .sticker{
   width: var(--sticker-size);
   height: var(--sticker-size);
@@ -113,6 +100,25 @@
   flex-direction: column;
   overflow: hidden;
   box-shadow: none !important;
+
+  position: relative;            /* ✅ for watermark */
+}
+
+/* ✅ Big watermark (uses empty space nicely) */
+.sticker-page .sticker::before{
+  content: attr(data-meal);      /* LUNCH / DINNER */
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  letter-spacing: 2px;
+  transform: rotate(-12deg);
+  opacity: .08;
+  pointer-events: none;
+  z-index: 0;
+  text-transform: uppercase;
 }
 
 /* Header */
@@ -125,7 +131,8 @@
   padding: 1.0mm 1.1mm;
   display: flex;
   flex-direction: column;
-  gap: 0.4mm;
+  gap: 0.6mm;
+  z-index: 2;
 }
 
 .sticker-page .sticker-customer{
@@ -138,7 +145,7 @@
 }
 
 .sticker-page .sticker-location{
-  font-weight: 700;
+  font-weight: 800;
   text-align: right;
   white-space: nowrap;
   overflow: hidden;
@@ -147,98 +154,66 @@
   line-height: 1.05;
 }
 
-/* Body layout (IMPORTANT for 35 visibility) */
+/* Body: center content so it doesn't look empty */
 .sticker-page .sticker-body{
-  margin-top: 0.6mm;     /* ✅ reduced gap between header and meta */
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
-  flex-direction: column;
+  align-items: center;            /* ✅ center vertically */
+  justify-content: flex-start;    /* ✅ left aligned (uses space nicely) */
+  padding: 2.5mm 1.5mm 1.5mm 1.5mm;
+  z-index: 2;
 }
 
-.sticker-page .sticker-meta{
-  display: flex;
-  justify-content: space-between;
-  font-weight: 800;
-  color: #374151;
-  padding: 0.35mm 0;
-  margin: 0 0 0.35mm 0;
-  border-bottom: 0.2mm dashed #cbd5e1;
+/* Meal block */
+.sticker-page .meal-block{
+  width: 100%;
 }
 
-/* Items */
-.sticker-page .sticker-items{
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.sticker-page .sticker-item{
-  display: flex;
-  justify-content: space-between;
-  gap: 1mm;
-  font-weight: 700;
-}
-
-.sticker-page .sticker-item-name{
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sticker-page .sticker-item-qty{
-  flex: 0 0 auto;
+.sticker-page .meal-label{
   font-weight: 900;
+  color: #111827;
+  opacity: .75;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
-.sticker-page .sticker-more{
-  margin-top: 0.3mm;
-  color: #6b7280;
-  font-weight: 800;
+.sticker-page .meal-value{
+  font-weight: 1000;
+  color: #111827;
+  text-transform: uppercase;
+  line-height: 1.05;
+  margin-top: 1mm;
 }
 
-/* Total */
-.sticker-page .sticker-total{
-  flex: 0 0 auto;
-  margin-top: 0.6mm;
-  padding-top: 0.45mm;
-  border-top: 0.2mm solid #e5e7eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-weight: 900;
-}
-
-.sticker-page .sticker-total .label{
-  letter-spacing: .4px;
+/* A nice divider line to balance empty space */
+.sticker-page .meal-divider{
+  margin-top: 2mm;
+  height: 0;
+  border-top: 0.2mm dashed #cbd5e1;
+  width: 80%;
 }
 
 /* =========================================================
-   FONT SIZES (tuned so 35 ALWAYS shows items)
+   FONT SIZES by layout
 ========================================================= */
 .sticker-page .per-35 .sticker-customer{ font-size: 7.3pt !important; }
 .sticker-page .per-35 .sticker-location{ font-size: 6.4pt !important; }
-.sticker-page .per-35 .sticker-meta{ font-size: 5.8pt !important; }
-.sticker-page .per-35 .sticker-items{ gap: 0.25mm !important; }
-.sticker-page .per-35 .sticker-item{ font-size: 6.0pt !important; line-height: 1.05 !important; }
-.sticker-page .per-35 .sticker-more{ font-size: 5.6pt !important; }
-.sticker-page .per-35 .sticker-total{ font-size: 6.8pt !important; }
+.sticker-page .per-35 .meal-label{ font-size: 6.2pt !important; }
+.sticker-page .per-35 .meal-value{ font-size: 14.5pt !important; }
+.sticker-page .per-35 .sticker::before{ font-size: 20pt !important; }
 
 .sticker-page .per-24 .sticker-customer{ font-size: 9.2pt !important; }
 .sticker-page .per-24 .sticker-location{ font-size: 8.0pt !important; }
-.sticker-page .per-24 .sticker-meta{ font-size: 7.2pt !important; }
-.sticker-page .per-24 .sticker-item{ font-size: 7.6pt !important; line-height: 1.08 !important; }
-.sticker-page .per-24 .sticker-total{ font-size: 9.2pt !important; }
+.sticker-page .per-24 .meal-label{ font-size: 7.2pt !important; }
+.sticker-page .per-24 .meal-value{ font-size: 18pt !important; }
+.sticker-page .per-24 .sticker::before{ font-size: 28pt !important; }
 
 .sticker-page .per-12 .sticker-customer{ font-size: 11.5pt !important; }
 .sticker-page .per-12 .sticker-location{ font-size: 10pt !important; }
-.sticker-page .per-12 .sticker-meta{ font-size: 8.2pt !important; }
-.sticker-page .per-12 .sticker-item{ font-size: 8.8pt !important; line-height: 1.12 !important; }
-.sticker-page .per-12 .sticker-total{ font-size: 11pt !important; }
+.sticker-page .per-12 .meal-label{ font-size: 8.6pt !important; }
+.sticker-page .per-12 .meal-value{ font-size: 24pt !important; }
+.sticker-page .per-12 .sticker::before{ font-size: 40pt !important; }
 </style>
 {% endblock %}
 
@@ -284,40 +259,18 @@
       <div class="stickers-wrap">
         <div class="stickers-grid per-{{ per_page }} layout-{{ per_page }}">
           {% for data in page %}
-            <div class="sticker">
+            <div class="sticker" data-meal="{{ meal_type }}">
               <div class="sticker-header">
                 <div class="sticker-customer">{{ data.entry.customer.name }}</div>
                 <div class="sticker-location">{{ data.entry.customer.delivery_location }}</div>
               </div>
 
               <div class="sticker-body">
-                <div class="sticker-meta">
-                  <span>{{ meal_type }}</span>
-                  <span>{{ entry_date }}</span>
+                <div class="meal-block">
+                  <div class="meal-label">Meal</div>
+                  <div class="meal-value">{{ meal_type }}</div>
+                  <div class="meal-divider"></div>
                 </div>
-
-                <div class="sticker-items">
-                  {% for item in data.items_display %}
-                    <div class="sticker-item">
-                      <span class="sticker-item-name">{{ item.dish_name }}</span>
-                      <span class="sticker-item-qty">×{{ item.qty }}</span>
-                    </div>
-                  {% empty %}
-                    <div class="sticker-item">
-                      <span class="sticker-item-name">No items</span>
-                      <span class="sticker-item-qty">—</span>
-                    </div>
-                  {% endfor %}
-
-                  {% if data.items_more_count %}
-                    <div class="sticker-more">+{{ data.items_more_count }} more</div>
-                  {% endif %}
-                </div>
-              </div>
-
-              <div class="sticker-total">
-                <span class="label">TOTAL</span>
-                <span>₹{{ data.entry.total_amount }}</span>
               </div>
             </div>
           {% endfor %}
@@ -342,7 +295,6 @@
     const dateInput = document.getElementById("dateInput");
     const form = document.getElementById("stickerFilters");
 
-    // ✅ Prevent future date selection
     if (dateInput) {
       const pad = (n) => String(n).padStart(2, "0");
       const now = new Date();

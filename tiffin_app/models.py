@@ -63,6 +63,12 @@ class UserProfile(models.Model):
 
 
 class Customer(models.Model):
+    MEAL_PREF_CHOICES = [
+        ("LUNCH", "Lunch"),
+        ("DINNER", "Dinner"),
+        ("BOTH", "Both"),
+    ]
+
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='customers')
     name = models.CharField(max_length=200)
     contact_number = models.CharField(max_length=20, blank=True)
@@ -70,6 +76,12 @@ class Customer(models.Model):
     delivery_location = models.CharField(max_length=500)
     daily_customer = models.BooleanField(default=True)  
     address = models.TextField(blank=True)
+    meal_preference = models.CharField(   # ✅ NEW
+        max_length=10,
+        choices=MEAL_PREF_CHOICES,
+        default="BOTH",
+    )
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -138,8 +150,9 @@ class DishPortion(models.Model):
 
 class Meal(models.Model):
     MEAL_TYPE_CHOICES = [
-        ('LUNCH', 'Lunch'),
-        ('DINNER', 'Dinner'),
+        ("LUNCH", "Lunch"),
+        ("DINNER", "Dinner"),
+        ("BOTH", "Both"),  # ✅ NEW
     ]
     
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='meals')

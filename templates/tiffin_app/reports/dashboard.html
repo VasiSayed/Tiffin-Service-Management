@@ -1,87 +1,160 @@
 {% extends 'tiffin_app/base.html' %}
 {% block title %}Reports{% endblock %}
 {% block page_title %}Reports{% endblock %}
+
 {% block content %}
 <div class="main-content">
-    
-        <div class="card">
-            <div class="card-body">
-<form method="get" class="filters" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
-  <div class="form-group" style="margin-bottom:0;">
-    <label class="form-label">Start Date</label>
-    <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
-  </div>
 
-  <div class="form-group" style="margin-bottom:0;">
-    <label class="form-label">End Date</label>
-    <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
-  </div>
+  <!-- ✅ Filters -->
+  <div class="card">
+    <div class="card-body">
+      <form method="get" class="filters" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Start Date</label>
+          <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+        </div>
 
-  <button type="submit" class="btn btn-primary" style="height:42px; padding:0 22px;">
-    Generate Report
-  </button>
-</form>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">End Date</label>
+          <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+        </div>
 
-            </div>
-        </div>
-        
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Total Orders</div>
-                <div class="stat-value">{{ total_orders }}</div>
-            </div>
-            <div class="stat-card warning">
-                <div class="stat-label">Total Revenue</div>
-                <div class="stat-value">₹{{ total_revenue }}</div>
-            </div>
-            <div class="stat-card success">
-                <div class="stat-label">Total Received</div>
-                <div class="stat-value">₹{{ total_received }}</div>
-            </div>
-            <div class="stat-card danger">
-                <div class="stat-label">Outstanding</div>
-                <div class="stat-value">₹{{ outstanding }}</div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Lunch vs Dinner</h2>
-            </div>
-            <div class="card-body">
-                <div class="form-row">
-                    <div>
-                        <strong>Lunch:</strong> {{ lunch_count }} orders, ₹{{ lunch_revenue }}
-                    </div>
-                    <div>
-                        <strong>Dinner:</strong> {{ dinner_count }} orders, ₹{{ dinner_revenue }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Top Customers</h2>
-            </div>
-            <div class="card-body card-body-compact">
-                <table class="table">
-                    <thead>
-                        <tr><th>Customer</th><th>Order Count</th><th>Total Spent</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for customer in top_customers %}
-                        <tr>
-                            <td><strong>{{ customer.name }}</strong></td>
-                            <td>{{ customer.order_count }}</td>
-                            <td>₹{{ customer.total_spent }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="3" class="text-center">No data found</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <button type="submit" class="btn btn-primary" style="height:42px; padding:0 22px;">
+          Generate Report
+        </button>
+      </form>
     </div>
+  </div>
+
+  <!-- ✅ Summary stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Orders</div>
+      <div class="stat-value">{{ total_orders }}</div>
+    </div>
+
+    <div class="stat-card warning">
+      <div class="stat-label">Total Revenue</div>
+      <div class="stat-value">₹{{ total_revenue }}</div>
+    </div>
+
+    <div class="stat-card success">
+      <div class="stat-label">Total Received</div>
+      <div class="stat-value">₹{{ total_received }}</div>
+    </div>
+
+    <div class="stat-card danger">
+      <div class="stat-label">Outstanding</div>
+      <div class="stat-value">₹{{ outstanding }}</div>
+    </div>
+  </div>
+
+  <!-- ✅ Lunch vs Dinner -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Lunch vs Dinner</h2>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div>
+          <strong>Lunch:</strong> {{ lunch_count }} orders, ₹{{ lunch_revenue }}
+        </div>
+        <div>
+          <strong>Dinner:</strong> {{ dinner_count }} orders, ₹{{ dinner_revenue }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Top Customers -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Top Customers</h2>
+    </div>
+
+    <div class="card-body card-body-compact">
+
+      <style>
+        /* ✅ Entire row clickable */
+        .click-row { cursor: pointer; }
+        .click-row:hover { background: #f9fafb; }
+
+        /* ✅ Remove hyperlink look */
+        .row-link {
+          text-decoration: none !important;
+          color: inherit !important;
+        }
+        .row-link:hover,
+        .row-link:focus,
+        .row-link:active {
+          text-decoration: none !important;
+          color: inherit !important;
+        }
+      </style>
+
+      <table class="table" id="topCustomersTable">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Order Count</th>
+            <th>Total Spent</th>
+            <th>Avg / Order</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for customer in top_customers %}
+          <tr
+            class="click-row"
+            data-href="{% url 'report_customer_detail' customer.id %}?start_date={{ start_date }}&end_date={{ end_date }}"
+            title="View customer orders"
+          >
+            <td>
+              <!-- ✅ Keep anchor for accessibility, but no link styling -->
+              <a class="row-link"
+                 href="{% url 'report_customer_detail' customer.id %}?start_date={{ start_date }}&end_date={{ end_date }}">
+                <strong>{{ customer.name }}</strong>
+              </a>
+
+              <div style="font-size:12px; opacity:.8;">
+                {{ customer.delivery_location|default:"-" }} • {{ customer.contact_number|default:"-" }}
+              </div>
+            </td>
+
+            <td>{{ customer.order_count }}</td>
+
+            <td>₹{{ customer.total_spent }}</td>
+
+            <td>₹{{ customer.avg_order_value|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center">No data found</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <script>
+        // ✅ Whole row click => navigate
+        (function () {
+          const table = document.getElementById("topCustomersTable");
+          if (!table) return;
+
+          table.addEventListener("click", function (e) {
+            // if click is on a link/button/input etc, let it work normally
+            if (e.target.closest("a, button, input, select, textarea, label")) return;
+
+            const row = e.target.closest("tr[data-href]");
+            if (!row) return;
+
+            window.location.href = row.getAttribute("data-href");
+          });
+        })();
+      </script>
+
+    </div>
+  </div>
+
+</div>
 {% endblock %}

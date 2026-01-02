@@ -17,6 +17,7 @@
 
       <!-- ✅ Filters Toolbar -->
       <div class="filters" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+
         <div class="search-box" style="flex: 1; min-width: 240px;">
           <input
             type="text"
@@ -31,6 +32,16 @@
             <option value="ALL">All (Daily + Occasional)</option>
             <option value="DAILY">Daily</option>
             <option value="OCCASIONAL">Occasional</option>
+          </select>
+        </div>
+
+        <!-- ✅ NEW: Meal Filter -->
+        <div style="min-width: 160px;">
+          <select id="mealFilter" class="form-control">
+            <option value="ALL">Meal: All</option>
+            <option value="LUNCH">Lunch</option>
+            <option value="DINNER">Dinner</option>
+            <option value="BOTH">Both</option>
           </select>
         </div>
 
@@ -49,7 +60,7 @@
           </select>
         </div>
 
-        <button type="button" id="resetBtn" class="btn btn-secondary">Reset</button>
+        <!-- <button type="button" id="resetBtn" class="btn btn-secondary">Reset</button> -->
       </div>
 
       <!-- ✅ Counts -->
@@ -67,6 +78,7 @@
             <tr>
               <th>Name</th>
               <th>Phone</th>
+              <th>Meal</th>
               <th>Location</th>
               <th>Type</th>
               <th>Active</th>
@@ -81,13 +93,25 @@
               data-phone="{{ customer.contact_number|default:''|lower }}"
               data-location="{{ customer.delivery_location|default:''|lower }}"
               data-type="{% if customer.daily_customer %}DAILY{% else %}OCCASIONAL{% endif %}"
+              data-meal="{{ customer.meal_preference|default:'BOTH' }}"
               data-active="{% if customer.is_active %}1{% else %}0{% endif %}"
             >
               <td><strong>{{ customer.name }}</strong></td>
               <td>{{ customer.contact_number }}</td>
+
+              <!-- ✅ Meal Preference -->
+              <td>
+                {% if customer.meal_preference == "LUNCH" %}
+                  <span class="badge badge-info">Lunch</span>
+                {% elif customer.meal_preference == "DINNER" %}
+                  <span class="badge badge-warning">Dinner</span>
+                {% else %}
+                  <span class="badge badge-success">Both</span>
+                {% endif %}
+              </td>
+
               <td>{{ customer.delivery_location }}</td>
 
-              <!-- ✅ Daily/Occasional badge -->
               <td>
                 {% if customer.daily_customer %}
                   <span class="badge badge-info">Daily</span>
@@ -114,7 +138,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="6" class="text-center">No customers found</td>
+              <td colspan="7" class="text-center">No customers found</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -125,7 +149,6 @@
   </div>
 </div>
 
-<!-- ✅ JS: Search + Filter + Sort + Live Counts -->
 <script>
 (function () {
   const tbody = document.getElementById("customerTbody");
@@ -135,6 +158,7 @@
 
   const $search = document.getElementById("customerSearch");
   const $typeFilter = document.getElementById("typeFilter");
+  const $mealFilter = document.getElementById("mealFilter"); // ✅ NEW
   const $sortBy = document.getElementById("sortBy");
   const $sortDir = document.getElementById("sortDir");
   const $resetBtn = document.getElementById("resetBtn");
@@ -155,22 +179,25 @@
   const apply = () => {
     const q = ($search.value || "").trim().toLowerCase();
     const tf = $typeFilter.value; // ALL / DAILY / OCCASIONAL
+    const mf = $mealFilter.value; // ALL / LUNCH / DINNER / BOTH
 
-    // show/hide
     let visible = [];
     for (const r of rows) {
       const type = r.dataset.type || "OCCASIONAL";
+      const meal = (r.dataset.meal || "BOTH").toUpperCase();
+
       const matchType = (tf === "ALL") ? true : (type === tf);
+      const matchMeal = (mf === "ALL") ? true : (meal === mf);
       const matchSearch = !q ? true : getTextForSearch(r).includes(q);
 
-      const ok = matchType && matchSearch;
+      const ok = matchType && matchMeal && matchSearch;
       r.style.display = ok ? "" : "none";
       if (ok) visible.push(r);
     }
 
-    // sort only visible rows (DOM reorder)
-    const by = $sortBy.value; // name/phone/location
-    const dir = $sortDir.value; // asc/desc
+    // sort visible
+    const by = $sortBy.value;
+    const dir = $sortDir.value;
     const mult = dir === "desc" ? -1 : 1;
 
     visible.sort((a, b) => {
@@ -185,13 +212,12 @@
       return va.localeCompare(vb) * mult;
     });
 
-    // re-append in sorted order (only visible first, then hidden)
     const hidden = rows.filter(r => r.style.display === "none");
     tbody.innerHTML = "";
     visible.forEach(r => tbody.appendChild(r));
     hidden.forEach(r => tbody.appendChild(r));
 
-    // counts (based on visible)
+    // counts
     let total = visible.length;
     let daily = 0, occasional = 0, active = 0, inactive = 0;
 
@@ -223,18 +249,19 @@
 
   $search.addEventListener("input", applyDebounced);
   $typeFilter.addEventListener("change", apply);
+  $mealFilter.addEventListener("change", apply); // ✅ NEW
   $sortBy.addEventListener("change", apply);
   $sortDir.addEventListener("change", apply);
 
   $resetBtn.addEventListener("click", () => {
     $search.value = "";
     $typeFilter.value = "ALL";
+    $mealFilter.value = "ALL"; // ✅ NEW
     $sortBy.value = "name";
     $sortDir.value = "asc";
     apply();
   });
 
-  // initial run
   apply();
 })();
 </script>

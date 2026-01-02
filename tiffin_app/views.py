@@ -1,5 +1,5 @@
 import json
-import json
+from django.db.models import Q
 from datetime import date
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Q
@@ -130,6 +130,32 @@ def _to_bool(v, default=False):
     return s in ("1", "true", "yes", "on")
 
 
+from django.db.models import Value as V, Case, When, IntegerField
+from django.db.models.functions import Lower, Trim, Coalesce
+
+def order_customers_by_location(qs):
+    """
+    ✅ Sort order:
+      1) location blank LAST
+      2) location A-Z
+      3) Regular (daily_customer=True) first
+      4) name A-Z
+    """
+    loc_raw = Trim(Coalesce("delivery_location", V("")))
+
+    return (
+        qs.annotate(_loc_raw=loc_raw, loc_key=Lower(loc_raw))
+          .annotate(
+              loc_blank=Case(
+                  When(_loc_raw="", then=1),
+                  default=0,
+                  output_field=IntegerField(),
+              )
+          )
+          .order_by("loc_blank", "loc_key", "-daily_customer", "name", "id")
+    )
+
+
 # ---------------- permissions ----------------
 def require_admin(view_func):
     @wraps(view_func)
@@ -201,7 +227,8 @@ def customer_list(request):
             | Q(delivery_location__icontains=search)
         )
 
-    customers = customers.order_by("name")
+    customers = order_customers_by_location(customers)
+
 
     return render(
         request,
@@ -216,13 +243,16 @@ def customer_list(request):
 def customer_add(request):
     if request.method == "POST":
         tenant = _tenant(request)
+        meal_preference = request.POST.get("meal_preference") or "BOTH"
+
         Customer.objects.create(
             tenant=tenant,
             name=request.POST["name"],
             contact_number=request.POST.get("contact_number", ""),
             email=request.POST.get("email") or None,
             delivery_location=request.POST["delivery_location"],
-            daily_customer=request.POST.get("daily_customer") == "on",  # ✅ ADD
+            meal_preference=meal_preference,  # ✅ NEW
+            daily_customer=request.POST.get("daily_customer") == "on",
             address=request.POST.get("address", ""),
             is_active=request.POST.get("is_active") == "on",
         )
@@ -241,6 +271,7 @@ def customer_edit(request, pk):
         customer.name = request.POST["name"]
         customer.contact_number = request.POST.get("contact_number", "")
         customer.email = request.POST.get("email") or None
+        customer.meal_preference = request.POST.get("meal_preference") or "BOTH"
         customer.delivery_location = request.POST["delivery_location"]
         customer.daily_customer = request.POST.get("daily_customer") == "on"  # ✅ ADD
         customer.address = request.POST.get("address", "")
@@ -422,7 +453,7 @@ def meal_bulk_create(request):
 
     if not name:
         return JsonResponse({"success": False, "error": "Meal name required"}, status=400)
-    if meal_type not in ("LUNCH", "DINNER"):
+    if meal_type not in ("LUNCH", "DINNER", "BOTH"):
         return JsonResponse({"success": False, "error": "Invalid meal_type"}, status=400)
 
     try:
@@ -641,7 +672,10 @@ def daily_entry_add(request):
             url = f"{url}?menu_id={menu_id}"
         return redirect(url)
 
-    customers = Customer.objects.filter(tenant=tenant, is_active=True).order_by("name")
+    customers = order_customers_by_location(
+    Customer.objects.filter(tenant=tenant, is_active=True)
+    )
+
     allowed_types = [meal_type, "BOTH"] if meal_type in ("LUNCH", "DINNER") else ["BOTH"]
 
     menus_qs = (
@@ -694,7 +728,12 @@ def daily_entry_detail(request, pk):
     tenant = _tenant(request)
     entry = get_object_or_404(DailyEntry, pk=pk, tenant=tenant)
 
-    meals = Meal.objects.filter(tenant=tenant, meal_type=entry.meal_type, is_active=True)
+    meals = Meal.objects.filter(
+        tenant=tenant,
+        is_active=True
+    ).filter(
+        Q(meal_type=entry.meal_type) | Q(meal_type="BOTH")
+    )
 
     menu_id = (request.GET.get("menu_id") or "").strip()
     selected_menu = None
@@ -759,9 +798,11 @@ def order_meal_bulk_add(request, entry_pk):
             tenant=tenant,
             is_active=True,
             id__in=meal_ids,
-            meal_type=entry.meal_type,
-        ).prefetch_related("template_items__dish", "template_items__portion")
+        )
+        .filter(Q(meal_type=entry.meal_type) | Q(meal_type="BOTH"))
+        .prefetch_related("template_items__dish", "template_items__portion")
     )
+
     meal_map = {m.id: m for m in meals_qs}
 
     created_count = 0
@@ -916,7 +957,7 @@ def daily_entry_bulk_create(request):
 
     if not entry_date:
         return JsonResponse({"success": False, "error": "Invalid entry_date"}, status=400)
-    if meal_type not in ("LUNCH", "DINNER"):
+    if meal_type not in ("LUNCH", "DINNER", "BOTH"):
         return JsonResponse({"success": False, "error": "Invalid meal_type"}, status=400)
     if not isinstance(customer_ids, list) or not customer_ids:
         return JsonResponse({"success": False, "error": "Select at least 1 customer"}, status=400)
@@ -950,7 +991,8 @@ def daily_entry_bulk_create(request):
 
     all_entries = DailyEntry.objects.filter(
         tenant=tenant, entry_date=entry_date, meal_type=meal_type, customer_id__in=cust_ids
-    ).select_related("customer").order_by("customer__name")
+    ).select_related("customer").order_by("customer__delivery_location", "customer__name", "id")
+
 
     results = [{"entry_id": e.id, "customer_id": e.customer_id, "customer_name": e.customer.name} for e in all_entries]
     return JsonResponse({"success": True, "count": len(results), "entries": results})
@@ -1112,7 +1154,10 @@ def payments(request):
 
     year, month_num = map(int, month.split("-"))
 
-    customers = Customer.objects.filter(tenant=tenant, is_active=True)
+    customers = order_customers_by_location(
+    Customer.objects.filter(tenant=tenant, is_active=True)
+)
+
     customer_data = []
 
     total_raised = Decimal("0")
@@ -1168,26 +1213,57 @@ def payment_add(request):
         messages.success(request, "Payment recorded successfully")
         return redirect("payments")
 
-    customers = Customer.objects.filter(tenant=tenant, is_active=True)
+    customers = order_customers_by_location(
+    Customer.objects.filter(tenant=tenant, is_active=True)
+)
     return render(request, "tiffin_app/payments/form.html", {"customers": customers, "today": str(date.today())})
 
 
 # ---------------- reports ----------------
+from datetime import date
+from decimal import Decimal
+from django.db.models import Count, Sum
+from django.shortcuts import render, get_object_or_404
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_GET
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+
+# ✅ your models
+from .models import Customer, DailyEntry, Payment
+
+
 @login_required
 @require_admin
 def reports(request):
     tenant = _tenant(request)
-    start_date = request.GET.get("start_date", str(date.today().replace(day=1)))
-    end_date = request.GET.get("end_date", str(date.today()))
 
-    entries = DailyEntry.objects.filter(tenant=tenant, entry_date__gte=start_date, entry_date__lte=end_date)
+    # ✅ robust date parsing
+    start_raw = request.GET.get("start_date") or str(date.today().replace(day=1))
+    end_raw = request.GET.get("end_date") or str(date.today())
+
+    start_obj = parse_date(start_raw) or date.today().replace(day=1)
+    end_obj = parse_date(end_raw) or date.today()
+
+    # ✅ if user gave reverse
+    if end_obj < start_obj:
+        start_obj, end_obj = end_obj, start_obj
+
+    entries = DailyEntry.objects.filter(
+        tenant=tenant,
+        entry_date__gte=start_obj,
+        entry_date__lte=end_obj,
+    )
 
     total_orders = entries.count()
     total_revenue = entries.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
 
     total_received = (
-        Payment.objects.filter(tenant=tenant, payment_date__gte=start_date, payment_date__lte=end_date)
-        .aggregate(total=Sum("amount"))["total"]
+        Payment.objects.filter(
+            tenant=tenant,
+            payment_date__gte=start_obj,
+            payment_date__lte=end_obj,
+        ).aggregate(total=Sum("amount"))["total"]
         or Decimal("0")
     )
 
@@ -1197,15 +1273,29 @@ def reports(request):
     lunch_revenue = entries.filter(meal_type="LUNCH").aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
     dinner_revenue = entries.filter(meal_type="DINNER").aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
 
+    # ✅ Top customers in this range (with extra info)
     top_customers = (
-        Customer.objects.filter(orders__entry_date__gte=start_date, orders__entry_date__lte=end_date, tenant=tenant)
-        .annotate(order_count=Count("orders"), total_spent=Sum("orders__total_amount"))
+        Customer.objects.filter(
+            tenant=tenant,
+            orders__entry_date__gte=start_obj,
+            orders__entry_date__lte=end_obj,
+        )
+        .annotate(
+            order_count=Count("orders", distinct=True),
+            total_spent=Sum("orders__total_amount"),
+        )
         .order_by("-total_spent")[:10]
     )
 
+    # ✅ add avg per order (python-side)
+    for c in top_customers:
+        oc = c.order_count or 0
+        ts = c.total_spent or Decimal("0")
+        c.avg_order_value = (ts / oc) if oc else Decimal("0")
+
     context = {
-        "start_date": start_date,
-        "end_date": end_date,
+        "start_date": start_obj.isoformat(),
+        "end_date": end_obj.isoformat(),
         "total_orders": total_orders,
         "total_revenue": total_revenue,
         "total_received": total_received,
@@ -1217,6 +1307,134 @@ def reports(request):
         "top_customers": top_customers,
     }
     return render(request, "tiffin_app/reports/dashboard.html", context)
+
+
+# ✅ NEW: Customer detail PAGE (DailyEntry objects list)
+@login_required
+@require_admin
+def report_customer_detail(request, customer_id):
+    tenant = _tenant(request)
+
+    start_raw = request.GET.get("start_date") or str(date.today().replace(day=1))
+    end_raw = request.GET.get("end_date") or str(date.today())
+
+    start_obj = parse_date(start_raw) or date.today().replace(day=1)
+    end_obj = parse_date(end_raw) or date.today()
+
+    if end_obj < start_obj:
+        start_obj, end_obj = end_obj, start_obj
+
+    customer = get_object_or_404(Customer, tenant=tenant, id=customer_id)
+
+    entries = (
+        DailyEntry.objects.filter(
+            tenant=tenant,
+            customer=customer,
+            entry_date__gte=start_obj,
+            entry_date__lte=end_obj,
+        )
+        .select_related("menu")
+        .prefetch_related("order_meals__meal")
+        .order_by("-entry_date", "meal_type", "-id")
+    )
+
+    total_orders = entries.count()
+    total_spent = entries.aggregate(s=Sum("total_amount"))["s"] or Decimal("0")
+
+    lunch_count = entries.filter(meal_type="LUNCH").count()
+    dinner_count = entries.filter(meal_type="DINNER").count()
+
+    avg_order_value = (total_spent / total_orders) if total_orders else Decimal("0")
+
+    return render(
+        request,
+        "tiffin_app/reports/customer_detail.html",
+        {
+            "start_date": start_obj.isoformat(),
+            "end_date": end_obj.isoformat(),
+            "customer": customer,
+            "entries": entries,
+            "total_orders": total_orders,
+            "total_spent": total_spent,
+            "avg_order_value": avg_order_value,
+            "lunch_count": lunch_count,
+            "dinner_count": dinner_count,
+        },
+    )
+
+
+# ✅ NEW: API (same data JSON)
+@require_GET
+@login_required
+@require_admin
+def report_customer_entries_api(request, customer_id):
+    tenant = _tenant(request)
+
+    start_obj = parse_date(request.GET.get("start_date") or "")
+    end_obj = parse_date(request.GET.get("end_date") or "")
+    if not start_obj or not end_obj:
+        return JsonResponse({"success": False, "error": "start_date and end_date required (YYYY-MM-DD)"}, status=400)
+    if end_obj < start_obj:
+        start_obj, end_obj = end_obj, start_obj
+
+    customer = get_object_or_404(Customer, tenant=tenant, id=customer_id)
+
+    entries = (
+        DailyEntry.objects.filter(
+            tenant=tenant,
+            customer=customer,
+            entry_date__gte=start_obj,
+            entry_date__lte=end_obj,
+        )
+        .select_related("menu")
+        .prefetch_related("order_meals__meal")
+        .order_by("entry_date", "meal_type", "id")
+    )
+
+    out = []
+    for e in entries:
+        out.append({
+            "id": e.id,
+            "entry_date": e.entry_date.isoformat(),
+            "meal_type": e.meal_type,
+            "total_amount": str(e.total_amount),
+            "menu": None if not e.menu_id else {
+                "id": e.menu_id,
+                "menu_name": e.menu.menu_name or f"Menu #{e.menu_id}",
+                "meal_type": e.menu.meal_type,
+            },
+            "order_meals": [
+                {
+                    "id": om.id,
+                    "meal_id": om.meal_id,
+                    "meal_name": om.meal.name,
+                    "qty": om.qty,
+                    "unit_price": str(om.unit_price),
+                    "total_price": str(om.total_price),
+                }
+                for om in e.order_meals.all()
+            ],
+        })
+
+    total_spent = entries.aggregate(s=Sum("total_amount"))["s"] or Decimal("0")
+
+    return JsonResponse({
+        "success": True,
+        "start_date": start_obj.isoformat(),
+        "end_date": end_obj.isoformat(),
+        "customer": {
+            "id": customer.id,
+            "name": customer.name,
+            "delivery_location": customer.delivery_location,
+            "contact_number": customer.contact_number,
+            "meal_preference": customer.meal_preference,
+            "daily_customer": customer.daily_customer,
+        },
+        "count": len(out),
+        "total_spent": str(total_spent),
+        "entries": out,
+    })
+
 
 
 # ---------------- expenses: categories + items + API ----------------
@@ -2000,17 +2218,35 @@ def daily_menu_save_api(request):
 def daily_menu_list(request):
     tenant = _tenant(request)
 
-    selected_date = parse_date(request.GET.get("date") or "") or dt_date.today()
+    # ✅ start_date default today
+    start_raw = (request.GET.get("start_date") or "").strip()
+    end_raw = (request.GET.get("end_date") or "").strip()
+
+    start_date = parse_date(start_raw) or dt_date.today()
+    end_date = parse_date(end_raw) if end_raw else None
+
+    # ✅ if only start provided => same day
+    if not end_date:
+        end_date = start_date
+
+    # ✅ if end < start => swap
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+
     meal_type = (request.GET.get("meal_type") or "").strip().upper()  # LUNCH/DINNER/BOTH/""
+    q = (request.GET.get("q") or "").strip()
 
     qs = (
-        DailyMenu.objects.filter(tenant=tenant, date=selected_date)
+        DailyMenu.objects.filter(tenant=tenant, date__range=[start_date, end_date])
         .prefetch_related("items__dish")
-        .order_by("meal_type", "id")
+        .order_by("date", "meal_type", "id")
     )
 
     if meal_type in ("LUNCH", "DINNER", "BOTH"):
         qs = qs.filter(meal_type=meal_type)
+
+    if q:
+        qs = qs.filter(menu_name__icontains=q)
 
     menus = []
     for m in qs:
@@ -2018,17 +2254,18 @@ def daily_menu_list(request):
         for it in m.items.all():
             if it.dish_id:
                 items.append(it.dish.name)
-            elif it.dish_name:
+            elif getattr(it, "dish_name", None):
                 items.append(it.dish_name)
+
         menus.append(
-    {
-        "id": m.id,
-        "date": m.date,
-        "meal_type": m.meal_type,
-        "menu_name": m.menu_name or f"Menu #{m.id}",  # ✅ add
-        "notes": m.notes or "",
-        "items_text": ", ".join(items) if items else "-",
-    }
+            {
+                "id": m.id,
+                "date": m.date,
+                "meal_type": m.meal_type,
+                "menu_name": m.menu_name or f"Menu #{m.id}",
+                "notes": m.notes or "",
+                "items_text": ", ".join(items) if items else "-",
+            }
         )
 
     return render(
@@ -2036,8 +2273,10 @@ def daily_menu_list(request):
         "tiffin_app/daily_menu/list.html",
         {
             "today": dt_date.today().isoformat(),
-            "selected_date": selected_date.isoformat(),
-            "selected_meal_type": meal_type,
+            "selected_start_date": start_date.isoformat(),
+            "selected_end_date": end_raw,  # keep blank if user didn't enter
+            "selected_meal_type": meal_type,  # "" means All
+            "q": q,
             "menus": menus,
         },
     )
@@ -2137,7 +2376,7 @@ def customers_by_location_list(request):
         qs = qs.filter(
             Q(name__icontains=q)
             | Q(delivery_location__icontains=q)
-            | Q(phone__icontains=q)  # if exists
+            | Q(contact_number__icontains=q) # if exists
         )
 
     if daily == "yes":
@@ -2169,4 +2408,131 @@ def customers_by_location_list(request):
         },
     )
 
+
+
+from django.views.decorators.http import require_GET
+from django.utils.dateparse import parse_date
+from django.db.models import Count, Sum
+from django.http import JsonResponse
+from datetime import date as dt_date
+
+@require_GET
+@login_required
+@require_admin
+def daily_entries_summary_by_customer_api(request):
+    tenant = _tenant(request)
+
+    start = parse_date(request.GET.get("start_date") or "")
+    end = parse_date(request.GET.get("end_date") or "")
+
+    if not start or not end:
+        return JsonResponse({"success": False, "error": "start_date and end_date required (YYYY-MM-DD)"}, status=400)
+
+    if start > end:
+        return JsonResponse({"success": False, "error": "start_date cannot be after end_date"}, status=400)
+
+    qs = (
+        DailyEntry.objects.filter(tenant=tenant, entry_date__gte=start, entry_date__lte=end)
+        .values(
+            "customer_id",
+            "customer__name",
+            "customer__delivery_location",
+            "customer__contact_number",
+            "customer__meal_preference",
+        )
+        .annotate(
+            entry_count=Count("id"),
+            total_amount=Sum("total_amount"),
+        )
+        .order_by("-entry_count", "customer__name")
+    )
+
+    rows = []
+    for r in qs:
+        rows.append({
+            "customer_id": r["customer_id"],
+            "name": r["customer__name"],
+            "delivery_location": r["customer__delivery_location"],
+            "contact_number": r["customer__contact_number"],
+            "meal_preference": r["customer__meal_preference"],
+            "entry_count": r["entry_count"],
+            "total_amount": str(r["total_amount"] or 0),
+            "details_api": f"/api/daily-entries/by-customer/{r['customer_id']}/?start_date={start.isoformat()}&end_date={end.isoformat()}",
+        })
+
+    return JsonResponse({
+        "success": True,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "rows": rows,
+    })
+
+
+@require_GET
+@login_required
+@require_admin
+def daily_entries_by_customer_api(request, customer_id):
+    tenant = _tenant(request)
+
+    start = parse_date(request.GET.get("start_date") or "")
+    end = parse_date(request.GET.get("end_date") or "")
+
+    if not start or not end:
+        return JsonResponse({"success": False, "error": "start_date and end_date required (YYYY-MM-DD)"}, status=400)
+
+    if start > end:
+        return JsonResponse({"success": False, "error": "start_date cannot be after end_date"}, status=400)
+
+    customer = get_object_or_404(Customer, tenant=tenant, id=customer_id)
+
+    entries = (
+        DailyEntry.objects.filter(
+            tenant=tenant,
+            customer=customer,
+            entry_date__gte=start,
+            entry_date__lte=end,
+        )
+        .select_related("menu")
+        .prefetch_related("order_meals__meal")
+        .order_by("entry_date", "meal_type", "id")
+    )
+
+    out = []
+    for e in entries:
+        out.append({
+            "id": e.id,
+            "entry_date": e.entry_date.isoformat(),
+            "meal_type": e.meal_type,
+            "total_amount": str(e.total_amount),
+            "menu": None if not e.menu_id else {
+                "id": e.menu_id,
+                "menu_name": e.menu.menu_name or f"Menu #{e.menu_id}",
+                "meal_type": e.menu.meal_type,
+            },
+            "order_meals": [
+                {
+                    "id": om.id,
+                    "meal_id": om.meal_id,
+                    "meal_name": om.meal.name,
+                    "qty": om.qty,
+                    "unit_price": str(om.unit_price),
+                    "total_price": str(om.total_price),
+                }
+                for om in e.order_meals.all()
+            ],
+        })
+
+    return JsonResponse({
+        "success": True,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "customer": {
+            "id": customer.id,
+            "name": customer.name,
+            "delivery_location": customer.delivery_location,
+            "meal_preference": customer.meal_preference,
+        },
+        "count": len(out),
+        "entries": out,
+    })
 

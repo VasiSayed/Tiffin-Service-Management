@@ -91,6 +91,13 @@ urlpatterns = [
     path('expenses/api/items/', views.expense_items_api, name='expense_items_api'),
 
 
+    path("api/daily-entries/summary-by-customer/", views.daily_entries_summary_by_customer_api,
+        name="daily_entries_summary_by_customer_api"),
+
+    path("api/daily-entries/by-customer/<int:customer_id>/", views.daily_entries_by_customer_api,
+        name="daily_entries_by_customer_api"),
+
+
 
     path("daily-menu/", views.daily_menu_page, name="daily_menu_page"),
     path("daily-menu/api/get/", views.daily_menu_get_api, name="daily_menu_get_api"),
@@ -103,4 +110,6 @@ urlpatterns = [
     
     # Reports
     path('reports', views.reports, name='reports'),
+    path("reports/customer/<int:customer_id>/", views.report_customer_detail, name="report_customer_detail"),
+    path("api/reports/customer/<int:customer_id>/entries/", views.report_customer_entries_api, name="report_customer_entries_api"),
 ]

@@ -5,7 +5,6 @@
 
 {% block content %}
 <div class="main-content">
-
   <div class="card">
     <div class="card-body">
 
@@ -38,27 +37,40 @@
                  value="{{ customer.delivery_location|default:'' }}" required>
         </div>
 
+        <!-- ✅ Meal + Daily in ONE ROW (width adjusted) -->
+        <div class="form-row form-row-2">
+          <div class="form-group">
+            <label for="meal_preference" class="form-label">Meal Type *</label>
+            <select id="meal_preference" name="meal_preference" class="form-control" required>
+              <option value="LUNCH" {% if customer.meal_preference == "LUNCH" %}selected{% endif %}>Lunch</option>
+              <option value="DINNER" {% if customer.meal_preference == "DINNER" %}selected{% endif %}>Dinner</option>
+              <option value="BOTH"
+                {% if not customer or customer.meal_preference == "BOTH" or not customer.meal_preference %}selected{% endif %}
+              >Both</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="display:flex; align-items:flex-end;">
+            <label class="toggle" style="margin:0;">
+              <input id="dailyCustomer" type="checkbox" name="daily_customer"
+                {% if customer %}
+                  {% if customer.daily_customer %}checked{% endif %}
+                {% else %}
+                  checked
+                {% endif %}
+              >
+              <span class="track"><span class="thumb"></span></span>
+              <span class="text">Daily Customer</span>
+            </label>
+          </div>
+        </div>
+
         <div class="form-group">
           <label for="address" class="form-label">Address</label>
           <textarea id="address" name="address" class="form-control">{{ customer.address|default:'' }}</textarea>
         </div>
 
-        <!-- ✅ Daily Customer toggle -->
-        <div class="form-group">
-          <label class="toggle">
-            <input id="dailyCustomer" type="checkbox" name="daily_customer"
-              {% if customer %}
-                {% if customer.daily_customer %}checked{% endif %}
-              {% else %}
-                checked
-              {% endif %}
-            >
-            <span class="track"><span class="thumb"></span></span>
-            <span class="text">Daily Customer</span>
-          </label>
-        </div>
-
-        <!-- ✅ Active toggle (same style as meal) -->
+        <!-- ✅ Active toggle -->
         <div class="form-group">
           <label class="toggle">
             <input id="isActive" type="checkbox" name="is_active"
@@ -72,10 +84,28 @@
           <button type="submit" class="btn btn-primary">Save</button>
           <a href="{% url 'customer_list' %}" class="btn btn-secondary">Cancel</a>
         </div>
-
       </form>
 
     </div>
   </div>
 </div>
+
+<style>
+  /* if your base doesn't already define form-row */
+  .form-row{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .form-row .form-group{
+    flex:1 1 240px;
+    min-width:240px;
+  }
+
+  /* ✅ Meal + Daily row: keep in one row nicely */
+  .form-row-2 .form-group{
+    flex:1 1 320px;
+    min-width:260px;
+  }
+</style>
 {% endblock %}

@@ -60,15 +60,20 @@
             style="margin-bottom:10px;"
           />
 
-          <!-- actual select used for submit -->
+          <!-- ✅ actual select used for submit -->
           <select name="customer" class="form-control" required id="customer-select">
             <option value="">Select Customer</option>
+
             {% for customer in customers %}
-              <option value="{{ customer.pk }}">
-                {{ customer.name }}
-                ({% if customer.daily_customer %}Regular{% else %}Occasional{% endif %})
-                - {{ customer.delivery_location }}
-              </option>
+              {% with mp=customer.meal_preference|default:"BOTH" %}
+                <option value="{{ customer.pk }}">
+                  {{ customer.name }}
+                  ({% if customer.daily_customer %}Regular{% else %}Occasional{% endif %})
+                  -
+                  {% if mp == "LUNCH" %}Lunch{% elif mp == "DINNER" %}Dinner{% else %}Both{% endif %}
+                  - {{ customer.delivery_location }}
+                </option>
+              {% endwith %}
             {% endfor %}
           </select>
 
@@ -102,7 +107,6 @@
   dateEl.addEventListener("change", reloadForMenus);
   mealEl.addEventListener("change", reloadForMenus);
 
-
   // ✅ Searchable customer dropdown (no library)
   (function () {
     const searchEl = document.getElementById("customer-search");
@@ -111,6 +115,7 @@
     if (!searchEl || !selectEl) return;
 
     const placeholder = selectEl.querySelector('option[value=""]');
+
     const original = Array.from(selectEl.querySelectorAll("option"))
       .filter(o => o.value); // only real customers
 
@@ -124,13 +129,10 @@
       const query = (q || "").trim().toLowerCase();
       const prev = selectEl.value;
 
-      // clear and re-add placeholder
       selectEl.innerHTML = "";
       if (placeholder) selectEl.appendChild(placeholder);
 
-      const filtered = !query
-        ? data
-        : data.filter(x => x.key.includes(query));
+      const filtered = !query ? data : data.filter(x => x.key.includes(query));
 
       for (const x of filtered) {
         const opt = document.createElement("option");
@@ -139,13 +141,10 @@
         selectEl.appendChild(opt);
       }
 
-      // restore selection if still present
       const stillExists = Array.from(selectEl.options).some(o => o.value === prev);
       selectEl.value = stillExists ? prev : "";
 
-      if (helpEl) {
-        helpEl.textContent = `Showing ${filtered.length} customer(s)`;
-      }
+      if (helpEl) helpEl.textContent = `Showing ${filtered.length} customer(s)`;
     };
 
     const debounce = (fn, ms) => {
@@ -156,10 +155,7 @@
       };
     };
 
-    const onType = debounce(() => rebuild(searchEl.value), 120);
-    searchEl.addEventListener("input", onType);
-
-    // initial text
+    searchEl.addEventListener("input", debounce(() => rebuild(searchEl.value), 120));
     rebuild("");
   })();
 </script>
