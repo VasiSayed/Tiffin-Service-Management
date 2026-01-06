@@ -51,7 +51,7 @@ urlpatterns = [
 
     # ✅ single add (existing)
     path('daily-entry/<int:entry_pk>/meals/add', views.order_meal_add, name='order_meal_add'),
-
+    path("customers/<int:customer_id>/history/", views.customer_order_history, name="customer_order_history"),
     # ✅ bulk add (NEW)
     path('daily-entry/<int:entry_pk>/meals/bulk-add/', views.order_meal_bulk_add, name='order_meal_bulk_add'),
 
@@ -61,6 +61,7 @@ urlpatterns = [
 
     # (optional multi-customer create)
     path('daily-entry/api/bulk-create', views.daily_entry_bulk_create, name='daily_entry_bulk_create'),
+    path("daily-entry/register/", views.daily_entry_register, name="daily_entry_register"),
 
     # Print Stickers
     path('print-stickers', views.print_stickers, name='print_stickers'),
@@ -91,10 +92,10 @@ urlpatterns = [
     path('expenses/api/items/', views.expense_items_api, name='expense_items_api'),
 
 
-    path("api/daily-entries/summary-by-customer/", views.daily_entries_summary_by_customer_api,
+    path("daily-entries/summary-by-customer/", views.daily_entries_summary_by_customer_api,
         name="daily_entries_summary_by_customer_api"),
 
-    path("api/daily-entries/by-customer/<int:customer_id>/", views.daily_entries_by_customer_api,
+    path("daily-entries/by-customer/<int:customer_id>/", views.daily_entries_by_customer_api,
         name="daily_entries_by_customer_api"),
 
 
