@@ -1146,45 +1146,71 @@ def print_stickers(request):
         },
     )
 
+from decimal import Decimal
+from django.db.models import Q, Sum, Max, Value as V
+from django.db.models.functions import Coalesce
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from datetime import date
+
 @login_required
 @require_admin
 def payments(request):
     tenant = _tenant(request)
     month = request.GET.get("month", date.today().strftime("%Y-%m"))
 
-    year, month_num = map(int, month.split("-"))
+    # ✅ robust parsing
+    try:
+        year, month_num = map(int, month.split("-"))
+    except Exception:
+        year, month_num = date.today().year, date.today().month
+        month = f"{year:04d}-{month_num:02d}"
 
-    customers = order_customers_by_location(
-    Customer.objects.filter(tenant=tenant, is_active=True)
-)
+    # ✅ month filters (tenant-safe)
+    orders_q = Q(
+        orders__tenant=tenant,
+        orders__entry_date__year=year,
+        orders__entry_date__month=month_num,
+    )
+
+    pays_q = Q(
+        payments__tenant=tenant,
+        payments__payment_date__year=year,
+        payments__payment_date__month=month_num,
+    )
+
+    # ✅ All customers + amounts in ONE query
+    customers = (
+        Customer.objects.filter(tenant=tenant, is_active=True)
+        .annotate(
+            raised=Coalesce(Sum("orders__total_amount", filter=orders_q), V(Decimal("0"))),
+            received=Coalesce(Sum("payments__amount", filter=pays_q), V(Decimal("0"))),
+            last_payment_date=Max("payments__payment_date", filter=Q(payments__tenant=tenant)),
+        )
+        # ✅ order by amount (Raised desc). If you want by Balance, use "-balance" after python compute.
+        .order_by("-raised", "name", "id")
+    )
 
     customer_data = []
-
     total_raised = Decimal("0")
     total_received = Decimal("0")
 
-    for customer in customers:
-        raised = (
-            DailyEntry.objects.filter(customer=customer, entry_date__year=year, entry_date__month=month_num)
-            .aggregate(total=Sum("total_amount"))["total"]
-            or Decimal("0")
-        )
+    for c in customers:
+        raised = c.raised or Decimal("0")
+        received = c.received or Decimal("0")
+        balance = raised - received
 
-        received = (
-            Payment.objects.filter(customer=customer, payment_date__year=year, payment_date__month=month_num)
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0")
-        )
-
-        last_payment = Payment.objects.filter(customer=customer).order_by("-payment_date").first()
-
-        customer_data.append(
-            {"customer": customer, "raised": raised, "received": received, "balance": raised - received, "last_payment": last_payment}
-        )
+        customer_data.append({
+            "customer": c,
+            "raised": raised,
+            "received": received,
+            "balance": balance,
+            "last_payment_date": c.last_payment_date,  # ✅ use this in template
+        })
 
         total_raised += raised
         total_received += received
-
+    customer_data.sort(key=lambda x: x["balance"], reverse=True)
     context = {
         "customer_data": customer_data,
         "total_raised": total_raised,
@@ -1220,32 +1246,21 @@ def payment_add(request):
 
 
 # ---------------- reports ----------------
-from datetime import date
 from decimal import Decimal
-from django.db.models import Count, Sum
-from django.shortcuts import render, get_object_or_404
-from django.utils.dateparse import parse_date
-from django.views.decorators.http import require_GET
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-
-# ✅ your models
-from .models import Customer, DailyEntry, Payment
-
+from django.db.models import Count, Sum, Q, Value as V
+from django.db.models.functions import Coalesce
 
 @login_required
 @require_admin
 def reports(request):
     tenant = _tenant(request)
 
-    # ✅ robust date parsing
     start_raw = request.GET.get("start_date") or str(date.today().replace(day=1))
     end_raw = request.GET.get("end_date") or str(date.today())
 
     start_obj = parse_date(start_raw) or date.today().replace(day=1)
     end_obj = parse_date(end_raw) or date.today()
 
-    # ✅ if user gave reverse
     if end_obj < start_obj:
         start_obj, end_obj = end_obj, start_obj
 
@@ -1258,9 +1273,10 @@ def reports(request):
     total_orders = entries.count()
     total_revenue = entries.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
 
+    # ✅ payments (keep tenant filter OR use customer__tenant safety)
     total_received = (
         Payment.objects.filter(
-            tenant=tenant,
+            customer__tenant=tenant,   # ✅ more robust
             payment_date__gte=start_obj,
             payment_date__lte=end_obj,
         ).aggregate(total=Sum("amount"))["total"]
@@ -1273,21 +1289,23 @@ def reports(request):
     lunch_revenue = entries.filter(meal_type="LUNCH").aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
     dinner_revenue = entries.filter(meal_type="DINNER").aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
 
-    # ✅ Top customers in this range (with extra info)
-    top_customers = (
-        Customer.objects.filter(
-            tenant=tenant,
-            orders__entry_date__gte=start_obj,
-            orders__entry_date__lte=end_obj,
-        )
-        .annotate(
-            order_count=Count("orders", distinct=True),
-            total_spent=Sum("orders__total_amount"),
-        )
-        .order_by("-total_spent")[:10]
+    # ✅ ALL customers + amount wise (date range filter inside annotations)
+    date_q = Q(
+        orders__tenant=tenant,
+        orders__entry_date__gte=start_obj,
+        orders__entry_date__lte=end_obj,
     )
 
-    # ✅ add avg per order (python-side)
+    top_customers = (
+        Customer.objects.filter(tenant=tenant, is_active=True)
+        .annotate(
+            order_count=Count("orders", filter=date_q, distinct=True),
+            total_spent=Coalesce(Sum("orders__total_amount", filter=date_q), V(Decimal("0"))),
+        )
+        .order_by("-total_spent", "-order_count", "name", "id")
+    )
+
+    # ✅ avg/order
     for c in top_customers:
         oc = c.order_count or 0
         ts = c.total_spent or Decimal("0")
@@ -1304,10 +1322,9 @@ def reports(request):
         "dinner_count": dinner_count,
         "lunch_revenue": lunch_revenue,
         "dinner_revenue": dinner_revenue,
-        "top_customers": top_customers,
+        "top_customers": top_customers,  # ✅ now ALL customers, not only 10
     }
     return render(request, "tiffin_app/reports/dashboard.html", context)
-
 
 # ✅ NEW: Customer detail PAGE (DailyEntry objects list)
 @login_required

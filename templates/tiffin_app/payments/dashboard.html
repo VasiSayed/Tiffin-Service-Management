@@ -65,7 +65,10 @@
             <td class="{% if data.balance > 0 %}text-danger{% else %}text-success{% endif %}">
               <strong>₹{{ data.balance }}</strong>
             </td>
-            <td>{% if data.last_payment %}{{ data.last_payment.payment_date }}{% else %}-{% endif %}</td>
+<td>
+  {% if data.last_payment_date %}{{ data.last_payment_date }}{% else %}-{% endif %}
+</td>
+
             <td>
               <a href="{% url 'payment_add' %}?customer={{ data.customer.pk }}" class="btn btn-sm btn-primary">
                 Add Payment
