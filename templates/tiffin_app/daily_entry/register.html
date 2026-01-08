@@ -4,116 +4,55 @@
 
 {% block content %}
 <style>
-/* Custom multi-select dropdown styles */
-.custom-multiselect {
-  position: relative;
-}
+.custom-multiselect { position: relative; }
 
-.custom-multiselect-display {
-  min-height: 38px;
-  padding: 6px 12px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  font-size: 14px;
+.custom-multiselect-display{
+  min-height:38px; padding:6px 12px; border:1px solid #ced4da; border-radius:4px;
+  background:#fff; cursor:pointer; display:flex; align-items:center; font-size:14px;
 }
+.custom-multiselect-display:hover { border-color:#80bdff; }
+.custom-multiselect-placeholder{ color:#6c757d; }
 
-.custom-multiselect-display:hover {
-  border-color: #80bdff;
+.custom-multiselect-dropdown{
+  position:absolute; top:100%; left:0; right:0; max-height:240px; overflow-y:auto;
+  background:#fff; border:1px solid #ced4da; border-radius:4px;
+  box-shadow:0 4px 12px rgba(0,0,0,.15); z-index:1000; margin-top:2px; display:none;
 }
+.custom-multiselect-dropdown.active{ display:block; }
 
-.custom-multiselect-placeholder {
-  color: #6c757d;
+.custom-multiselect-option{
+  padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:14px;
 }
+.custom-multiselect-option:hover{ background:#f8f9fa; }
+.custom-multiselect-option input[type="checkbox"]{ cursor:pointer; }
 
-.custom-multiselect-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 240px;
-  overflow-y: auto;
-  background: white;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  z-index: 1000;
-  margin-top: 2px;
-  display: none;
-}
-
-.custom-multiselect-dropdown.active {
-  display: block;
-}
-
-.custom-multiselect-option {
-  padding: 8px 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.custom-multiselect-option:hover {
-  background: #f8f9fa;
-}
-
-.custom-multiselect-option input[type="checkbox"] {
-  cursor: pointer;
-}
-
-.custom-multiselect-count {
-  background: #007bff;
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  margin-left: 6px;
+.custom-multiselect-count{
+  background:#007bff; color:#fff; padding:2px 8px; border-radius:12px;
+  font-size:12px; font-weight:600; margin-left:6px;
 }
 
 /* Tighter table columns */
-.table th, .table td {
-  padding: 8px 6px;
-  vertical-align: middle;
+.table th, .table td{ padding:8px 6px; vertical-align:middle; }
+.table th:nth-child(5), .table td:nth-child(5){
+  max-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-
-.table th:nth-child(5), .table td:nth-child(5) { /* Location */
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.table th:nth-child(6), .table td:nth-child(6) { /* Meal Type */
-  width: 100px;
-}
+.table th:nth-child(6), .table td:nth-child(6){ width:100px; }
 
 /* Clickable rows */
-tbody tr {
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
+tbody tr{ cursor:pointer; transition:background-color .15s; }
+tbody tr:hover{ background:#f8f9fa !important; }
+tbody tr.selected{ background:#e7f3ff !important; }
+tbody tr.table-success.selected{ background:#d4edda !important; }
 
-tbody tr:hover {
-  background-color: #f8f9fa !important;
-}
-
-tbody tr.selected {
-  background-color: #e7f3ff !important;
-}
-
-tbody tr.table-success.selected {
-  background-color: #d4edda !important;
+/* Modal */
+#historyModal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999; }
+#historyModal .hm-card{
+  background:#fff; max-width:820px; margin:60px auto; border-radius:12px; overflow:hidden;
 }
 </style>
 
 <div class="main-content">
-<form method="post">
+<form method="post" id="regForm">
   {% csrf_token %}
   <input type="hidden" name="entry_date" value="{{ selected_date }}">
 
@@ -203,7 +142,9 @@ tbody tr.table-success.selected {
         {% for r in rows %}
           <tr class="{% if r.exists_any %}table-success{% endif %}" data-customer-id="{{ r.customer.id }}">
             <td onclick="event.stopPropagation()">
-              <input type="checkbox" class="row-check">
+              <!-- hidden always submits -->
+              <input type="hidden" name="enabled_{{ r.customer.id }}" value="0">
+              <input type="checkbox" class="row-check" name="enabled_{{ r.customer.id }}" value="1">
             </td>
 
             <td><strong>{{ r.customer.name }}</strong></td>
@@ -252,31 +193,33 @@ tbody tr.table-success.selected {
                 <div class="custom-multiselect-dropdown">
                   {% for meal in meals %}
                     <label class="custom-multiselect-option">
-                      <input type="checkbox" 
-                             name="meals_{{ r.customer.id }}" 
-                             value="{{ meal.id }}" 
-                             data-price="{{ meal.price }}" 
-                             data-name="{{ meal.name }}"
-                             {% if meal.id|stringformat:"s" in r.selected_meal_ids %}checked{% endif %}>
+                      <input type="checkbox"
+                             name="meals_{{ r.customer.id }}"
+                             value="{{ meal.id }}"
+                             data-price="{{ meal.price }}"
+                             data-name="{{ meal.name }}">
                       <span>{{ meal.name }} (₹{{ meal.price }})</span>
                     </label>
                   {% endfor %}
                 </div>
               </div>
+
+              <!-- ✅ KEY FIX: always submit selected ids as CSV -->
+              <input type="hidden" name="meals_csv_{{ r.customer.id }}" class="meals-csv" value="">
             </td>
 
             <td onclick="event.stopPropagation()">
-              <input type="number" name="qty_{{ r.customer.id }}" class="form-control form-control-sm row-qty" min="1"
-                     value="{{ r.qty }}">
+              <input type="number" name="qty_{{ r.customer.id }}" class="form-control form-control-sm row-qty" min="1" value="1">
             </td>
 
             <td>
-              <input type="text" class="form-control form-control-sm row-amt" readonly value="{{ r.amount }}">
+              <input type="text" class="form-control form-control-sm row-amt" readonly value="0">
             </td>
 
             <td onclick="event.stopPropagation()">
-              <button type="button" class="btn btn-sm btn-outline-primary history-btn" 
-                      data-customer-id="{{ r.customer.id }}" 
+              <button type="button"
+                      class="btn btn-sm btn-outline-primary history-btn"
+                      data-customer-id="{{ r.customer.id }}"
                       data-customer-name="{{ r.customer.name }}">
                 History
               </button>
@@ -292,8 +235,8 @@ tbody tr.table-success.selected {
 </div>
 
 <!-- ================= HISTORY MODAL ================= -->
-<div id="historyModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999;">
-  <div style="background:#fff; max-width:820px; margin:60px auto; border-radius:12px; overflow:hidden;">
+<div id="historyModal">
+  <div class="hm-card" id="hmCard">
     <div style="padding:14px 16px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
       <div>
         <div style="font-weight:800;" id="hmTitle">History</div>
@@ -314,14 +257,14 @@ tbody tr.table-success.selected {
     catch { return String(n || 0); }
   };
 
-  // ========== CUSTOM MULTISELECT LOGIC ==========
+  // ========== CUSTOM MULTISELECT ==========
   class CustomMultiselect {
     constructor(wrapper) {
       this.wrapper = wrapper;
       this.display = wrapper.querySelector('.custom-multiselect-display');
       this.dropdown = wrapper.querySelector('.custom-multiselect-dropdown');
       this.checkboxes = wrapper.querySelectorAll('input[type="checkbox"]');
-      
+
       this.display.addEventListener('click', (e) => {
         e.stopPropagation();
         this.toggle();
@@ -331,7 +274,7 @@ tbody tr.table-success.selected {
         cb.addEventListener('change', () => {
           this.updateDisplay();
           const row = this.wrapper.closest('tr');
-          if (row) calcRow(row);
+          if (row) calcRow(row);   // also sync csv inside calcRow
         });
       });
 
@@ -340,27 +283,18 @@ tbody tr.table-success.selected {
 
     toggle() {
       const wasActive = this.dropdown.classList.contains('active');
-      document.querySelectorAll('.custom-multiselect-dropdown.active').forEach(dd => {
-        dd.classList.remove('active');
-      });
-      if (!wasActive) {
-        this.dropdown.classList.add('active');
-      }
-    }
-
-    close() {
-      this.dropdown.classList.remove('active');
+      document.querySelectorAll('.custom-multiselect-dropdown.active').forEach(dd => dd.classList.remove('active'));
+      if (!wasActive) this.dropdown.classList.add('active');
     }
 
     updateDisplay() {
       const selected = Array.from(this.checkboxes).filter(cb => cb.checked);
       const displaySpan = this.display.querySelector('span');
-      
+
       if (selected.length === 0) {
         displaySpan.innerHTML = '<span class="custom-multiselect-placeholder">Select meals...</span>';
       } else if (selected.length <= 2) {
-        const names = selected.map(cb => cb.dataset.name).join(', ');
-        displaySpan.textContent = names;
+        displaySpan.textContent = selected.map(cb => cb.dataset.name).join(', ');
       } else {
         const firstName = selected[0].dataset.name;
         displaySpan.innerHTML = `${firstName} <span class="custom-multiselect-count">+${selected.length - 1}</span>`;
@@ -370,46 +304,52 @@ tbody tr.table-success.selected {
     getSelected() {
       return Array.from(this.checkboxes)
         .filter(cb => cb.checked)
-        .map(cb => ({ id: cb.value, price: cb.dataset.price }));
+        .map(cb => ({ id: String(cb.value), price: cb.dataset.price }));
     }
 
     setSelected(ids) {
-      this.checkboxes.forEach(cb => {
-        cb.checked = ids.includes(cb.value);
-      });
+      const set = new Set((ids || []).map(String));
+      this.checkboxes.forEach(cb => { cb.checked = set.has(String(cb.value)); });
       this.updateDisplay();
     }
   }
 
+  const table = document.getElementById("regTable");
+
+  // master ms
   const masterMultiselect = new CustomMultiselect(document.getElementById('mMealsWrapper'));
 
+  // row multiselects
   const rowMultiselects = new Map();
   document.querySelectorAll('.row-meals-wrapper').forEach(wrapper => {
     const row = wrapper.closest('tr');
-    const ms = new CustomMultiselect(wrapper);
-    rowMultiselects.set(row, ms);
+    rowMultiselects.set(row, new CustomMultiselect(wrapper));
   });
 
+  // close dropdown when clicking outside
   document.addEventListener('click', () => {
-    document.querySelectorAll('.custom-multiselect-dropdown.active').forEach(dd => {
-      dd.classList.remove('active');
-    });
+    document.querySelectorAll('.custom-multiselect-dropdown.active').forEach(dd => dd.classList.remove('active'));
   });
 
-  // ========== ROW CALCULATION ==========
+  // ========== ROW CALC + CSV SYNC (✅ KEY FIX) ==========
   const calcRow = (row) => {
     const qty = Number(row.querySelector(".row-qty").value || 1);
-    const multiselect = rowMultiselects.get(row);
-    if (!multiselect) return;
-    
-    const selected = multiselect.getSelected();
+    const ms = rowMultiselects.get(row);
+    if (!ms) return;
+
+    const selected = ms.getSelected();
     const total = selected.reduce((sum, item) => sum + (Number(item.price) * qty), 0);
     row.querySelector(".row-amt").value = fmtINR(total);
+
+    // ✅ write CSV for backend
+    const hidden = row.querySelector(".meals-csv");
+    if (hidden) hidden.value = selected.map(x => x.id).join(",");
   };
 
-  const table = document.getElementById("regTable");
+  // initial calc (sets csv too)
   table.querySelectorAll("tbody tr").forEach(r => calcRow(r));
 
+  // qty changes
   table.addEventListener("input", (e) => {
     if (e.target.classList.contains("row-qty")) {
       const row = e.target.closest("tr");
@@ -417,23 +357,20 @@ tbody tr.table-success.selected {
     }
   });
 
-  // ========== ROW CLICK TO SELECT ==========
+  // ========== ROW CLICK SELECT ==========
   table.querySelectorAll("tbody tr").forEach(row => {
     row.addEventListener("click", (e) => {
       if (e.target.closest('input, select, button, .custom-multiselect')) return;
-      
-      const checkbox = row.querySelector(".row-check");
-      checkbox.checked = !checkbox.checked;
-      row.classList.toggle("selected", checkbox.checked);
+      const cb = row.querySelector(".row-check");
+      cb.checked = !cb.checked;
+      row.classList.toggle("selected", cb.checked);
     });
 
-    const checkbox = row.querySelector(".row-check");
-    checkbox.addEventListener("change", () => {
-      row.classList.toggle("selected", checkbox.checked);
-    });
+    const cb = row.querySelector(".row-check");
+    cb.addEventListener("change", () => row.classList.toggle("selected", cb.checked));
   });
 
-  // ========== MASTER CONTROLS ==========
+  // ========== MASTER APPLY ==========
   const mMealType = document.getElementById("mMealType");
   const mDailyMenu = document.getElementById("mDailyMenu");
   const mQty = document.getElementById("mQty");
@@ -449,7 +386,7 @@ tbody tr.table-success.selected {
     let qty = Number(mQty.value || 1);
     if (!Number.isFinite(qty) || qty <= 0) qty = 1;
 
-    const selectedMealIds = masterMultiselect.getSelected().map(item => item.id);
+    const selectedMealIds = masterMultiselect.getSelected().map(x => x.id);
     const mealTypeVal = mMealType.value;
     const menuVal = mDailyMenu.value;
 
@@ -461,95 +398,79 @@ tbody tr.table-success.selected {
       row.querySelector(".row-qty").value = qty;
 
       if (selectedMealIds.length) {
-        const multiselect = rowMultiselects.get(row);
-        if (multiselect) {
-          multiselect.setSelected(selectedMealIds);
-        }
+        const ms = rowMultiselects.get(row);
+        if (ms) ms.setSelected(selectedMealIds);
       }
-      
-      calcRow(row);
+      calcRow(row); // sets amount + csv
     });
   });
 
-  // ========== HISTORY MODAL ==========
+  // ========== SAFETY: before submit sync all csv ==========
+  document.getElementById("regForm").addEventListener("submit", () => {
+    table.querySelectorAll("tbody tr").forEach(r => calcRow(r));
+  });
+
+  // ================= HISTORY MODAL =================
   const modal = document.getElementById("historyModal");
+  const hmCard = document.getElementById("hmCard");
   const hmClose = document.getElementById("hmClose");
   const hmTitle = document.getElementById("hmTitle");
   const hmSub = document.getElementById("hmSub");
   const hmBody = document.getElementById("hmBody");
 
-  // Close modal function
-  const closeModal = () => { 
-    modal.style.display = "none"; 
-  };
+  const openModal = () => { modal.style.display = "block"; };
+  const closeModal = () => { modal.style.display = "none"; };
 
-  // Close button
-  hmClose.addEventListener("click", closeModal);
-
-  // Close when clicking outside modal content
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) {
-      closeModal();
-    }
+  hmClose.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    closeModal();
   });
 
-  // History button click handler - FIXED VERSION
-  document.addEventListener("click", async (e) => {
-    // Check if the clicked element or its parent is the history button
-    const btn = e.target.closest(".history-btn");
-    if (!btn) return;
-    
-    // Prevent any other actions
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Get customer data from button's data attributes
-    const customerId = btn.getAttribute('data-customer-id');
-    const customerName = btn.getAttribute('data-customer-name');
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
 
-    console.log('History button clicked:', { customerId, customerName }); // Debug log
+  hmCard.addEventListener("click", (e) => e.stopPropagation());
 
-    if (!customerId) {
-      console.error("Customer ID not found");
-      alert("Error: Customer ID not found");
-      return;
-    }
+  document.querySelectorAll(".history-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
 
-    // Show modal with loading state
-    modal.style.display = "block";
-    hmTitle.textContent = `History - ${customerName}`;
-    hmSub.textContent = `Up to {{ selected_date }}`;
-    hmBody.innerHTML = '<div style="text-align:center; padding:20px;"><div class="spinner-border spinner-border-sm" role="status"></div><div style="margin-top:10px;">Loading history...</div></div>';
+      const customerId = btn.dataset.customerId;
+      const customerName = btn.dataset.customerName;
 
-    try {
-      const url = `/customers/${customerId}/history/?date={{ selected_date }}`;
-      console.log('Fetching from:', url); // Debug log
-      
-      const res = await fetch(url);
-      
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      
-      const data = await res.json();
-      console.log('Received data:', data); // Debug log
+      openModal();
+      hmTitle.textContent = `History - ${customerName}`;
+      hmSub.textContent = `Up to {{ selected_date }}`;
+      hmBody.innerHTML = `
+        <div style="text-align:center; padding:20px;">
+          <div class="spinner-border spinner-border-sm" role="status"></div>
+          <div style="margin-top:10px;">Loading history...</div>
+        </div>
+      `;
 
-      if (!data.history || !data.history.length) {
-        hmBody.innerHTML = `<div style="opacity:.7; text-align:center; padding:20px;">No history found for this customer.</div>`;
-        return;
-      }
+      try {
+        const url = `/customers/${customerId}/history/?date={{ selected_date }}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      let html = "";
-      data.history.forEach(h => {
-        html += `
-          <div style="padding:12px 0; border-bottom:1px solid #eee;">
-            <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:10px;">
-              <div>
-                <div style="font-weight:700; font-size:15px;">${h.date} - ${h.meal_type}</div>
-                <div style="opacity:.7; font-size:13px;">Total: ₹${fmtINR(h.total_amount)}</div>
+        const data = await res.json();
+        if (!data.history || !data.history.length) {
+          hmBody.innerHTML = `<div style="opacity:.7; text-align:center; padding:20px;">No history found.</div>`;
+          return;
+        }
+
+        let html = "";
+        data.history.forEach(h => {
+          html += `
+            <div style="padding:12px 0; border-bottom:1px solid #eee;">
+              <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:10px;">
+                <div>
+                  <div style="font-weight:700; font-size:15px;">${h.date} - ${h.meal_type}</div>
+                  <div style="opacity:.7; font-size:13px;">Total: ₹${fmtINR(h.total_amount)}</div>
+                </div>
               </div>
-            </div>
-            <div>
+
               <table class="table table-sm table-bordered">
                 <thead style="background:#f8f9fa;">
                   <tr>
@@ -571,20 +492,19 @@ tbody tr.table-success.selected {
                 </tbody>
               </table>
             </div>
+          `;
+        });
+
+        hmBody.innerHTML = html;
+      } catch (err) {
+        hmBody.innerHTML = `
+          <div class="alert alert-danger" style="margin:20px;">
+            <strong>Error!</strong> Failed to load history.
+            <br><small>${err.message}</small>
           </div>
         `;
-      });
-
-      hmBody.innerHTML = html;
-    } catch (err) {
-      console.error("Failed to load history:", err); // Debug log
-      hmBody.innerHTML = `
-        <div class="alert alert-danger" style="margin:20px;">
-          <strong>Error!</strong> Failed to load history. Please try again.
-          <br><small>${err.message}</small>
-        </div>
-      `;
-    }
+      }
+    });
   });
 
 })();

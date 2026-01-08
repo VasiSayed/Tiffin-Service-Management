@@ -209,7 +209,7 @@ class DailyEntry(models.Model):
     class Meta:
         ordering = ['-entry_date', 'customer__name']
         verbose_name_plural = 'Daily Entries'
-        unique_together = ['customer', 'entry_date', 'meal_type']
+        # ✅ removed unique_together so multiple entries allowed
 
     def __str__(self):
         return f"{self.customer.name} - {self.entry_date} ({self.meal_type})"
@@ -219,6 +219,7 @@ class DailyEntry(models.Model):
         self.total_amount = total
         self.save()
         return total
+
 
 
 class DailyMenu(models.Model):

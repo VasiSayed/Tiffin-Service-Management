@@ -1,6 +1,11 @@
 import json
 from django.db.models import Q
 from datetime import date
+from collections import defaultdict
+from datetime import date as dt_date
+from django.contrib.auth.decorators import login_required
+from django.db.models import Sum
+from django.utils.dateparse import parse_date
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Q
 from django.shortcuts import render
@@ -611,23 +616,62 @@ def meal_item_delete(request, pk):
     return redirect("meal_detail", pk=meal_pk)
 
 
-# ---------------- daily entry ----------------
+
+
+
 @login_required
 def daily_entry_list(request):
     tenant = _tenant(request)
-    entry_date = request.GET.get("date", str(date.today()))
-    meal_type = request.GET.get("meal_type", "LUNCH")
+    entry_date = parse_date(request.GET.get("date") or "") or dt_date.today()
 
+    # ✅ fetch all entries of that date
     entries = (
-        DailyEntry.objects.filter(tenant=tenant, entry_date=entry_date, meal_type=meal_type)
-        .select_related("customer")
+        DailyEntry.objects
+        .filter(tenant=tenant, entry_date=entry_date)
+        .select_related("customer", "menu")
+        .order_by("customer__delivery_location", "customer__name", "-created_at", "-id")
     )
+
+    # ✅ group by customer
+    grouped = defaultdict(lambda: {
+        "customer": None,
+        "location": "",
+        "type_label": "Occasional",
+        "lunch_count": 0,
+        "dinner_count": 0,
+        "total_amount": 0.0,
+        "entries": [],
+    })
+
+    for e in entries:
+        c = e.customer
+        g = grouped[c.id]
+        g["customer"] = c
+        g["location"] = (getattr(c, "delivery_location", "") or "").strip()
+        g["type_label"] = "Daily" if getattr(c, "daily_customer", False) else "Occasional"
+        g["total_amount"] += float(e.total_amount or 0)
+        g["entries"].append(e)
+
+        if e.meal_type == "LUNCH":
+            g["lunch_count"] += 1
+        elif e.meal_type == "DINNER":
+            g["dinner_count"] += 1
+
+    # ✅ final list sorted by location -> name
+    def _sort_key(g):
+        loc = (g.get("location") or "").lower()
+        nm = ((g.get("customer").name if g.get("customer") else "") or "").lower()
+        return (loc, nm)
+
+    groups = list(grouped.values())
+    groups.sort(key=_sort_key)
 
     return render(
         request,
         "tiffin_app/daily_entry/list.html",
-        {"entries": entries, "entry_date": entry_date, "meal_type": meal_type},
+        {"entry_date": entry_date.isoformat(), "groups": groups},
     )
+
 
 
 def _compact_items(items, max_items=5):
@@ -2610,6 +2654,57 @@ def _safe_int(v, default=1):
         return default
 
 
+# views.py
+from datetime import date as dt_date
+from decimal import Decimal
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.db.models import Q
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_http_methods
+
+from .models import Customer, DailyEntry, Meal, OrderMeal, DailyMenu
+
+
+# views.py
+from datetime import date as dt_date
+from decimal import Decimal
+from django.contrib import messages
+from django.db import transaction
+from django.shortcuts import render, redirect
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_http_methods
+
+from .models import Customer, DailyEntry, Meal, DailyMenu, OrderMeal
+
+def _safe_int(v, default=1):
+    try:
+        x = int(v)
+        return x if x > 0 else default
+    except Exception:
+        return default
+
+
+# views.py
+from datetime import date as dt_date
+from decimal import Decimal
+from django.contrib import messages
+from django.db import transaction
+from django.shortcuts import render, redirect
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_http_methods
+
+def _safe_int(v, default=1):
+    try:
+        x = int(v)
+        return x if x > 0 else default
+    except Exception:
+        return default
+
+
 @require_http_methods(["GET", "POST"])
 @login_required
 @require_admin
@@ -2628,185 +2723,118 @@ def daily_entry_register(request):
         tenant=tenant, date=selected_date
     ).order_by("meal_type", "menu_name", "id")
 
-    existing_entries = (
-        DailyEntry.objects.filter(tenant=tenant, entry_date=selected_date)
-        .select_related("customer")
-        .prefetch_related("order_meals__meal")
-    )
-    existing_map = {(e.customer_id, e.meal_type): e for e in existing_entries}
-
-    # -------------------------- POST SAVE --------------------------
+    # ================== POST: ALWAYS CREATE NEW ==================
     if request.method == "POST":
         d = parse_date(request.POST.get("entry_date") or "") or selected_date
 
-        created_count = 0
-        updated_count = 0
-        skipped_count = 0
+        created_entries = 0
+        skipped_rows = 0
+
+        print("==== DAILY REGISTER POST START ====")
+        print("DATE:", d)
+        print("POST keys sample:", list(request.POST.keys())[:25])
 
         for c in customers:
+            enabled_vals = request.POST.getlist(f"enabled_{c.id}")  # ['0','1'] possible
+            if "1" not in enabled_vals:
+                continue
+
             row_meal_type = (request.POST.get(f"meal_type_{c.id}") or "LUNCH").upper().strip()
             menu_id = (request.POST.get(f"daily_menu_{c.id}") or "").strip()
 
-            # MULTI meals
-            meal_ids = request.POST.getlist(f"meals_{c.id}")  # because <select multiple>
-            meal_ids = [m for m in meal_ids if str(m).strip()]
+            meal_ids = request.POST.getlist(f"meals_{c.id}")
+            meal_ids = [str(x).strip() for x in meal_ids if str(x).strip()]
+
             qty = _safe_int(request.POST.get(f"qty_{c.id}") or "1", default=1)
 
-            if not meal_ids:
-                skipped_count += 1
-                continue
+            print(f"\n-- customer={c.id} {c.name} enabled=1")
+            print("meal_type:", row_meal_type, "menu_id:", menu_id, "meal_ids:", meal_ids, "qty:", qty)
 
-            if row_meal_type not in ("LUNCH", "DINNER", "BOTH"):
+            # ✅ ONLY LUNCH / DINNER allowed
+            if row_meal_type not in ("LUNCH", "DINNER"):
+                print("INVALID meal_type -> forcing LUNCH")
                 row_meal_type = "LUNCH"
 
-            targets = ["LUNCH", "DINNER"] if row_meal_type == "BOTH" else [row_meal_type]
+            # must have meals
+            if not meal_ids:
+                print("SKIP: no meals selected")
+                skipped_rows += 1
+                continue
 
-            # fetch meals once
-            meal_qs = Meal.objects.filter(tenant=tenant, id__in=meal_ids, is_active=True)
+            # fetch selected meals
+            meal_qs = Meal.objects.filter(tenant=tenant, is_active=True, id__in=meal_ids)
             meal_by_id = {str(m.id): m for m in meal_qs}
-
-            chosen_meals = [meal_by_id.get(str(mid)) for mid in meal_ids]
+            chosen_meals = [meal_by_id.get(mid) for mid in meal_ids]
             chosen_meals = [m for m in chosen_meals if m is not None]
 
             if not chosen_meals:
-                skipped_count += 1
+                print("SKIP: meal_ids not found in DB")
+                skipped_rows += 1
                 continue
 
-            def save_one(meal_type):
-                nonlocal created_count, updated_count
+            # menu (optional)
+            menu_obj = None
+            if menu_id:
+                try:
+                    menu_obj = DailyMenu.objects.get(tenant=tenant, id=int(menu_id))
+                except Exception as ex:
+                    print("menu lookup failed:", ex)
+                    menu_obj = None
 
-                entry = existing_map.get((c.id, meal_type))
-                created = False
-                if not entry:
-                    entry = DailyEntry.objects.create(
-                        tenant=tenant,
-                        customer=c,
-                        entry_date=d,
-                        meal_type=meal_type,
-                        total_amount=Decimal("0.00"),
-                    )
-                    existing_map[(c.id, meal_type)] = entry
-                    created = True
+            # ✅ ALWAYS CREATE NEW ENTRY (no update)
+            entry = DailyEntry.objects.create(
+                tenant=tenant,
+                customer=c,
+                entry_date=d,
+                meal_type=row_meal_type,
+                menu=menu_obj,
+                total_amount=Decimal("0.00"),
+            )
+            print("CREATED DailyEntry id=", entry.id)
 
-                # if DailyEntry has daily_menu FK optionally
-                if menu_id:
-                    try:
-                        if hasattr(entry, "daily_menu_id"):
-                            entry.daily_menu_id = int(menu_id)
-                            entry.save(update_fields=["daily_menu"])
-                    except Exception:
-                        pass
+            total = Decimal("0.00")
+            for meal in chosen_meals:
+                unit_price = Decimal(str(meal.price or 0))
+                line_total = (unit_price * Decimal(qty)).quantize(Decimal("0.01"))
+                total += line_total
 
-                # replace all items for this entry
-                entry.order_meals.all().delete()
+                om = OrderMeal.objects.create(
+                    daily_entry=entry,
+                    meal=meal,
+                    qty=qty,
+                    unit_price=unit_price,
+                )
+                print("   + OrderMeal id=", om.id, "meal=", meal.id, "qty=", qty)
 
-                total = Decimal("0.00")
-                for meal in chosen_meals:
-                    unit_price = Decimal(str(meal.price or 0))
-                    line_total = (unit_price * Decimal(qty)).quantize(Decimal("0.01"))
-                    total += line_total
+            entry.total_amount = total.quantize(Decimal("0.01"))
+            entry.save(update_fields=["total_amount"])
+            created_entries += 1
+            print("UPDATED total_amount=", entry.total_amount)
 
-                    OrderMeal.objects.create(
-                        daily_entry=entry,
-                        meal=meal,
-                        qty=qty,
-                        unit_price=unit_price,
-                    )
-
-                entry.total_amount = total.quantize(Decimal("0.01"))
-                entry.save(update_fields=["total_amount"])
-
-                if created:
-                    created_count += 1
-                else:
-                    updated_count += 1
-
-            for t in targets:
-                save_one(t)
-
+        print("==== DAILY REGISTER POST END ====")
         messages.success(
             request,
-            f"Register saved for {d.isoformat()} | Created: {created_count}, Updated: {updated_count}, Skipped: {skipped_count}"
+            f"Saved register for {d.isoformat()} | New Entries: {created_entries} | Skipped Rows: {skipped_rows}"
         )
         return redirect(f"/daily-entry/register/?date={d.isoformat()}")
 
-    # -------------------------- PREFILL (build rows list) --------------------------
-    # We build rows as list so template can access directly (no dict indexing problems)
+    # ================== GET: NO PREFILL ==================
     rows = []
     for c in customers:
-        lunch = existing_map.get((c.id, "LUNCH"))
-        dinner = existing_map.get((c.id, "DINNER"))
-
-        def entry_payload(entry):
-            if not entry:
-                return {
-                    "exists": False,
-                    "meal_ids": [],
-                    "qty": 1,
-                    "amount": "0",
-                    "daily_menu_id": "",
-                }
-            oms = list(entry.order_meals.all())
-            meal_ids = [str(om.meal_id) for om in oms]
-            qty = oms[0].qty if oms else 1
-            menu_id = ""
-            if hasattr(entry, "daily_menu_id"):
-                menu_id = str(entry.daily_menu_id or "")
-            return {
-                "exists": True,
-                "meal_ids": meal_ids,
-                "qty": qty or 1,
-                "amount": str(entry.total_amount or 0),
-                "daily_menu_id": menu_id,
-            }
-
-        lunch_p = entry_payload(lunch)
-        dinner_p = entry_payload(dinner)
-
-        # decide row default meal_type
-        # if both exist and meals/qty same -> BOTH else prefer LUNCH if exists else DINNER else default by preference
-        row_meal_type = "LUNCH"
-        if lunch_p["exists"] and dinner_p["exists"]:
-            if set(lunch_p["meal_ids"]) == set(dinner_p["meal_ids"]) and lunch_p["qty"] == dinner_p["qty"]:
-                row_meal_type = "BOTH"
-            else:
-                row_meal_type = "LUNCH"
-        elif lunch_p["exists"]:
-            row_meal_type = "LUNCH"
-        elif dinner_p["exists"]:
-            row_meal_type = "DINNER"
-        else:
-            # fallback to customer preference if available
-            pref = (getattr(c, "meal_preference", "") or "BOTH").upper()
-            row_meal_type = "BOTH" if pref == "BOTH" else ("DINNER" if pref == "DINNER" else "LUNCH")
-
-        # show existing meals in row (if BOTH and same -> show that list; else show chosen side)
-        if row_meal_type == "BOTH" and lunch_p["exists"]:
-            row_meals = lunch_p["meal_ids"]
-            row_qty = lunch_p["qty"]
-            row_amount = lunch_p["amount"]
-            row_menu = lunch_p["daily_menu_id"]
-        elif row_meal_type == "DINNER":
-            row_meals = dinner_p["meal_ids"]
-            row_qty = dinner_p["qty"]
-            row_amount = dinner_p["amount"]
-            row_menu = dinner_p["daily_menu_id"]
-        else:
-            row_meals = lunch_p["meal_ids"]
-            row_qty = lunch_p["qty"]
-            row_amount = lunch_p["amount"]
-            row_menu = lunch_p["daily_menu_id"]
+        pref = (getattr(c, "meal_preference", "LUNCH") or "LUNCH").upper()
+        if pref not in ("LUNCH", "DINNER"):
+            pref = "LUNCH"
 
         rows.append({
             "customer": c,
             "type_label": "Daily" if getattr(c, "daily_customer", False) else "Occasional",
-            "preferred_meal": (getattr(c, "meal_preference", "BOTH") or "BOTH"),
-            "row_meal_type": row_meal_type,
-            "selected_meal_ids": row_meals,
-            "qty": row_qty or 1,
-            "amount": row_amount or "0",
-            "exists_any": bool(lunch_p["exists"] or dinner_p["exists"]),
-            "daily_menu_id": row_menu or "",
+            "preferred_meal": pref,
+            "exists_any": False,
+            "row_meal_type": pref,
+            "daily_menu_id": "",
+            "selected_meal_ids": [],
+            "qty": 1,
+            "amount": "0",
         })
 
     return render(
@@ -2819,7 +2847,6 @@ def daily_entry_register(request):
             "daily_menus": daily_menus,
         }
     )
-
 
 @require_http_methods(["GET"])
 @login_required

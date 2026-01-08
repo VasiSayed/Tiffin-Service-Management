@@ -8,144 +8,177 @@
 {% endblock %}
 
 {% block content %}
+<style>
+/* multi location select */
+.custom-multi { position: relative; }
+.custom-multi__display{
+  min-height:38px; padding:6px 12px; border:1px solid #ced4da; border-radius:4px;
+  background:#fff; cursor:pointer; display:flex; align-items:center; font-size:14px;
+}
+.custom-multi__display:hover{ border-color:#80bdff; }
+.custom-multi__dropdown{
+  position:absolute; top:100%; left:0; right:0; max-height:260px; overflow:auto;
+  background:#fff; border:1px solid #ced4da; border-radius:6px;
+  box-shadow:0 4px 12px rgba(0,0,0,.12); z-index:1000; margin-top:2px; display:none;
+}
+.custom-multi__dropdown.active{ display:block; }
+.custom-multi__opt{ padding:8px 10px; display:flex; gap:8px; align-items:center; cursor:pointer; }
+.custom-multi__opt:hover{ background:#f8f9fa; }
+.custom-multi__count{
+  background:#007bff; color:#fff; padding:2px 8px; border-radius:12px;
+  font-size:12px; font-weight:600; margin-left:6px;
+}
+.group-row{ cursor:pointer; }
+</style>
+
 <div class="main-content">
   <div class="card">
     <div class="card-body">
 
-      <!-- ✅ Filters Wrapper (clean toolbar style) -->
+      <!-- Filters -->
       <div class="filters-panel daily-entry-filters">
+        <div class="daily-entry-filters__top" style="display:flex; gap:12px; flex-wrap:wrap; align-items:end;">
 
-        <!-- ✅ TOP TOOLBAR (Date + Meal + Search + Location + Reset) -->
-        <div class="daily-entry-filters__top">
-
-          <!-- server-side: Date (keeps meal_type also) -->
           <form method="get" id="serverFilters" class="daily-entry-filters__date">
             <div class="form-group">
               <label class="form-label">Date</label>
-              <input
-                type="date"
-                name="date"
-                id="entryDate"
-                class="form-control"
-                value="{{ entry_date }}"
-                onchange="this.form.submit()"
-              >
-              <!-- ✅ preserve selected meal type on date change -->
-              <input type="hidden" name="meal_type" value="{{ meal_type }}">
+              <input type="date" name="date" id="entryDate" class="form-control"
+                     value="{{ entry_date }}" onchange="this.form.submit()">
             </div>
           </form>
 
-          <!-- meal type -->
-          <div class="form-group daily-entry-filters__meal">
-            <label class="form-label">Meal Type</label>
-            <div class="toggle-group w-full daily-entry-toggle">
-              <button
-                type="button"
-                class="toggle-btn {% if meal_type == 'LUNCH' %}active{% endif %}"
-                onclick="window.location='?date={{ entry_date }}&meal_type=LUNCH'"
-              >Lunch</button>
+          <div class="form-group" style="min-width:240px; flex:1;">
+            <label class="form-label">Search</label>
+            <input type="text" id="q" class="form-control" placeholder="Search customer / phone / location..." />
+          </div>
 
-              <button
-                type="button"
-                class="toggle-btn {% if meal_type == 'DINNER' %}active{% endif %}"
-                onclick="window.location='?date={{ entry_date }}&meal_type=DINNER'"
-              >Dinner</button>
+          <!-- ✅ MULTI Location -->
+          <div class="form-group" style="min-width:260px;">
+            <label class="form-label">Locations (multi)</label>
+            <div class="custom-multi" id="locWrap">
+              <div class="custom-multi__display" id="locDisplay">
+                <span style="opacity:.7;">All Locations</span>
+              </div>
+              <div class="custom-multi__dropdown" id="locDropdown"></div>
             </div>
           </div>
 
-          <!-- search -->
-          <div class="form-group daily-entry-filters__search">
-            <label class="form-label">Search</label>
-            <input
-              type="text"
-              id="q"
-              class="form-control"
-              placeholder="Search customer / phone / location..."
-            />
-          </div>
-
-          <!-- location -->
-          <div class="form-group daily-entry-filters__location">
-            <label class="form-label">Location</label>
-            <select id="loc" class="form-control">
-              <option value="ALL">All Locations</option>
-            </select>
-          </div>
-
-          <!-- reset -->
-          <div class="form-group daily-entry-filters__reset">
-            <label class="form-label">&nbsp;</label>
-            <button type="button" class="btn btn-secondary w-full" id="resetBtn">Reset</button>
-          </div>
-        </div>
-
-        <!-- ✅ SECOND ROW (Amounts + Sorting) -->
-        <div class="daily-entry-filters__bottom">
-          <div class="form-group">
-            <label class="form-label">Min Amount</label>
-            <input id="minAmt" type="number" class="form-control" placeholder="0" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Max Amount</label>
-            <input id="maxAmt" type="number" class="form-control" placeholder="99999" />
-          </div>
-
-          <div class="form-group">
+          <!-- Sort -->
+          <div class="form-group" style="min-width:190px;">
             <label class="form-label">Sort</label>
             <select id="sortBy" class="form-control">
-              <option value="customer">Customer</option>
               <option value="location">Location</option>
+              <option value="customer">Customer</option>
               <option value="amount">Amount</option>
             </select>
           </div>
 
-          <div class="form-group">
+          <div class="form-group" style="min-width:140px;">
             <label class="form-label">Order</label>
             <select id="sortDir" class="form-control">
               <option value="asc">Asc</option>
               <option value="desc">Desc</option>
             </select>
           </div>
+
+          <div class="form-group">
+            <label class="form-label">&nbsp;</label>
+            <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
+          </div>
         </div>
 
-        <!-- ✅ Stats -->
-        <div class="filter-stats daily-entry-filters__stats">
-          <span class="badge badge-info" id="statCount">Orders: 0</span>
+        <div class="filter-stats daily-entry-filters__stats" style="margin-top:10px;">
+          <span class="badge badge-info" id="statCount">Customers: 0</span>
           <span class="badge badge-success" id="statTotal">Total: ₹0</span>
         </div>
       </div>
 
-      <!-- ✅ Table -->
+      <!-- Table -->
       <div class="table-container" style="margin-top:12px;">
         <table class="table" id="entriesTable">
           <thead>
             <tr>
+              <th style="width:46px;"></th>
               <th>Customer</th>
-              <th>Delivery Location</th>
+              <th style="min-width:220px;">Meal Summary</th>
               <th>Total Amount</th>
-              <th>Actions</th>
+              <th style="width:120px;">Actions</th>
             </tr>
           </thead>
 
           <tbody id="entriesBody">
-            {% for entry in entries %}
-            <tr
-              data-customer="{{ entry.customer.name|default:''|lower }}"
-              data-phone="{{ entry.customer.contact_number|default:''|lower }}"
-              data-location="{{ entry.customer.delivery_location|default:'' }}"
-              data-location-l="{{ entry.customer.delivery_location|default:''|lower }}"
-              data-amount="{{ entry.total_amount|default:0 }}"
-            >
-              <td><strong>{{ entry.customer.name }}</strong></td>
-              <td>{{ entry.customer.delivery_location }}</td>
-              <td>₹{{ entry.total_amount }}</td>
-              <td>
-                <a href="{% url 'daily_entry_detail' entry.pk %}" class="btn btn-sm btn-primary">Open</a>
-              </td>
-            </tr>
+            {% for g in groups %}
+              <!-- parent row -->
+              <tr class="group-row"
+                  data-customer="{{ g.customer.name|default:''|lower }}"
+                  data-phone="{{ g.customer.contact_number|default:''|lower }}"
+                  data-location="{{ g.location|default:'' }}"
+                  data-location-l="{{ g.location|default:''|lower }}"
+                  data-type="{{ g.type_label|lower }}"
+                  data-amount="{{ g.total_amount|default:0 }}">
+                <td>
+                  <button type="button" class="btn btn-sm btn-outline-primary toggle-btn">+</button>
+                </td>
+
+                <!-- ✅ Single column: name - type - location -->
+                <td>
+                  <strong>{{ g.customer.name }}</strong>
+                  <span style="opacity:.75;"> - {{ g.type_label }} - {{ g.location }}</span>
+                </td>
+
+                <td>
+                  <span class="badge badge-info">Lunch({{ g.lunch_count }})</span>
+                  <span class="badge badge-warning">Dinner({{ g.dinner_count }})</span>
+                </td>
+
+                <td>₹{{ g.total_amount }}</td>
+
+                <td>
+                  <button type="button" class="btn btn-sm btn-primary toggle-btn2">Show</button>
+                </td>
+              </tr>
+
+              <!-- details row -->
+              <tr class="detail-row" style="display:none;">
+                <td colspan="5" style="background:#fafafa;">
+                  <div style="padding:10px 12px;">
+                    <div style="font-weight:700; margin-bottom:8px;">Entries</div>
+
+                    <table class="table table-sm table-bordered" style="margin:0;">
+                      <thead style="background:#f0f0f0;">
+                        <tr>
+                          <th style="width:120px;">Meal Type</th>
+                          <th>Menu</th>
+                          <th style="width:140px;">Amount</th>
+                          <th style="width:180px;">Created</th>
+                          <th style="width:90px;">Open</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for e in g.entries %}
+                        <tr>
+                          <td>
+                            {% if e.meal_type == "LUNCH" %}
+                              <span class="badge badge-info">Lunch</span>
+                            {% else %}
+                              <span class="badge badge-warning">Dinner</span>
+                            {% endif %}
+                          </td>
+                          <td>{% if e.menu %}{{ e.menu }}{% else %}-{% endif %}</td>
+                          <td>₹{{ e.total_amount }}</td>
+                          <td>{{ e.created_at }}</td>
+                          <td><a href="{% url 'daily_entry_detail' e.pk %}" class="btn btn-sm btn-outline-primary">Open</a></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center">No entries</td></tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </td>
+              </tr>
             {% empty %}
-            <tr><td colspan="4" class="text-center">No orders for this date and meal type</td></tr>
+              <tr><td colspan="5" class="text-center">No orders for this date</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -157,7 +190,7 @@
 
 <script>
 (function () {
-  // ✅ prevent future date selection
+  // prevent future date
   const entryDate = document.getElementById("entryDate");
   if (entryDate) {
     const today = new Date();
@@ -166,7 +199,6 @@
     const dd = String(today.getDate()).padStart(2, "0");
     const maxDate = `${yyyy}-${mm}-${dd}`;
     entryDate.setAttribute("max", maxDate);
-
     if (entryDate.value && entryDate.value > maxDate) {
       entryDate.value = maxDate;
       document.getElementById("serverFilters")?.submit();
@@ -176,62 +208,41 @@
   const tbody = document.getElementById("entriesBody");
   if (!tbody) return;
 
-  // ✅ IMPORTANT:
-  // Only real order rows have data-amount attribute
-  const allRows = Array.from(tbody.querySelectorAll("tr"));
-  const dataRows = allRows.filter((r) => r.hasAttribute("data-amount"));
+  const groupRows = Array.from(tbody.querySelectorAll("tr.group-row"));
 
-  // ✅ Create / reuse a "no results" row
-  let noResultsRow = document.getElementById("noResultsRow");
-  if (!noResultsRow) {
-    noResultsRow = document.createElement("tr");
-    noResultsRow.id = "noResultsRow";
-    noResultsRow.innerHTML = `<td colspan="4" class="text-center">No matching orders</td>`;
-    noResultsRow.style.display = "none";
-    tbody.appendChild(noResultsRow);
-  }
+  // toggle expand
+  const toggleFor = (groupRow) => {
+    const next = groupRow.nextElementSibling;
+    if (!next || !next.classList.contains("detail-row")) return;
+    const isOpen = next.style.display !== "none";
+    next.style.display = isOpen ? "none" : "";
+    const btn = groupRow.querySelector(".toggle-btn");
+    if (btn) btn.textContent = isOpen ? "+" : "-";
+  };
 
-  const $q = document.getElementById("q");
-  const $loc = document.getElementById("loc");
-  const $minAmt = document.getElementById("minAmt");
-  const $maxAmt = document.getElementById("maxAmt");
-  const $sortBy = document.getElementById("sortBy");
-  const $sortDir = document.getElementById("sortDir");
-  const $resetBtn = document.getElementById("resetBtn");
-  const $statCount = document.getElementById("statCount");
-  const $statTotal = document.getElementById("statTotal");
-
-  // build location dropdown from data rows only
-  const locSet = new Set();
-  dataRows.forEach((r) => {
-    const loc = (r.dataset.location || "").trim();
-    if (loc) locSet.add(loc);
+  groupRows.forEach((r) => {
+    r.querySelectorAll(".toggle-btn, .toggle-btn2").forEach((b) => {
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFor(r);
+      });
+    });
+    r.addEventListener("click", (e) => {
+      if (e.target.closest("a, button, input, select")) return;
+      toggleFor(r);
+    });
   });
 
-  // clear old generated options except ALL
-  const keepFirst = $loc.querySelector("option[value='ALL']");
-  $loc.innerHTML = "";
-  $loc.appendChild(keepFirst);
-
-  Array.from(locSet)
-    .sort((a, b) => a.localeCompare(b))
-    .forEach((l) => {
-      const opt = document.createElement("option");
-      opt.value = l;
-      opt.textContent = l;
-      $loc.appendChild(opt);
-    });
-
+  // helpers
   const parseAmt = (v) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   };
-
   const fmtINR = (n) => {
     try { return Number(n || 0).toLocaleString("en-IN"); }
     catch { return String(n || 0); }
   };
-
   const getSearchText = (r) => {
     const c = r.dataset.customer || "";
     const p = r.dataset.phone || "";
@@ -239,88 +250,172 @@
     return (c + " " + p + " " + l).toLowerCase();
   };
 
-  const apply = () => {
-    // If no server entries at all
-    if (dataRows.length === 0) {
-      $statCount.textContent = `Orders: 0`;
-      $statTotal.textContent = `Total: ₹0`;
-      noResultsRow.style.display = "";
+  // elements
+  const $q = document.getElementById("q");
+  const $resetBtn = document.getElementById("resetBtn");
+  const $statCount = document.getElementById("statCount");
+  const $statTotal = document.getElementById("statTotal");
+  const $sortBy = document.getElementById("sortBy");
+  const $sortDir = document.getElementById("sortDir");
+
+  // ================= MULTI LOCATION FILTER =================
+  const locWrap = document.getElementById("locWrap");
+  const locDisplay = document.getElementById("locDisplay");
+  const locDropdown = document.getElementById("locDropdown");
+
+  // build unique locations
+  const locSet = new Set();
+  groupRows.forEach((r) => {
+    const loc = (r.dataset.location || "").trim();
+    if (loc) locSet.add(loc);
+  });
+  const locList = Array.from(locSet).sort((a,b)=>a.localeCompare(b));
+
+  // state
+  let selectedLocs = new Set(); // empty => ALL
+
+  const renderLocDropdown = () => {
+    locDropdown.innerHTML = "";
+
+    // ALL option
+    const allLbl = document.createElement("label");
+    allLbl.className = "custom-multi__opt";
+    allLbl.innerHTML = `
+      <input type="checkbox" id="locAll" ${selectedLocs.size === 0 ? "checked" : ""}>
+      <strong>All Locations</strong>
+    `;
+    locDropdown.appendChild(allLbl);
+
+    // locations
+    locList.forEach((loc) => {
+      const lbl = document.createElement("label");
+      lbl.className = "custom-multi__opt";
+      const checked = selectedLocs.has(loc) ? "checked" : "";
+      lbl.innerHTML = `
+        <input type="checkbox" data-loc="${loc}" ${checked}>
+        <span>${loc}</span>
+      `;
+      locDropdown.appendChild(lbl);
+    });
+
+    // listeners
+    locDropdown.querySelector("#locAll")?.addEventListener("change", (e) => {
+      if (e.target.checked) selectedLocs = new Set();
+      renderLocDisplay();
+      apply();
+    });
+
+    locDropdown.querySelectorAll("input[data-loc]").forEach((cb) => {
+      cb.addEventListener("change", (e) => {
+        const l = e.target.getAttribute("data-loc");
+        if (e.target.checked) {
+          selectedLocs.add(l);
+        } else {
+          selectedLocs.delete(l);
+        }
+        renderLocDisplay();
+        apply();
+      });
+    });
+  };
+
+  const renderLocDisplay = () => {
+    if (selectedLocs.size === 0) {
+      locDisplay.innerHTML = `<span style="opacity:.7;">All Locations</span>`;
       return;
     }
+    const arr = Array.from(selectedLocs);
+    if (arr.length <= 2) {
+      locDisplay.textContent = arr.join(", ");
+    } else {
+      locDisplay.innerHTML = `${arr[0]} <span class="custom-multi__count">+${arr.length-1}</span>`;
+    }
+  };
 
+  // dropdown open/close
+  locDisplay.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const was = locDropdown.classList.contains("active");
+    document.querySelectorAll(".custom-multi__dropdown.active").forEach(d => d.classList.remove("active"));
+    if (!was) locDropdown.classList.add("active");
+  });
+  document.addEventListener("click", () => locDropdown.classList.remove("active"));
+
+  renderLocDropdown();
+  renderLocDisplay();
+
+  // ================= FILTER + SORT =================
+  const apply = () => {
     const q = ($q.value || "").trim().toLowerCase();
-    const loc = $loc.value || "ALL";
-    const minAmt = $minAmt.value ? Number($minAmt.value) : null;
-    const maxAmt = $maxAmt.value ? Number($maxAmt.value) : null;
 
     let visible = [];
-
-    for (const r of dataRows) {
-      const amt = parseAmt(r.dataset.amount);
+    groupRows.forEach((r) => {
       const matchQ = !q ? true : getSearchText(r).includes(q);
-      const matchLoc = (loc === "ALL") ? true : ((r.dataset.location || "") === loc);
 
-      let matchAmt = true;
-      if (minAmt !== null && Number.isFinite(minAmt)) matchAmt = matchAmt && (amt >= minAmt);
-      if (maxAmt !== null && Number.isFinite(maxAmt)) matchAmt = matchAmt && (amt <= maxAmt);
+      const loc = (r.dataset.location || "").trim();
+      const matchLoc = (selectedLocs.size === 0) ? true : selectedLocs.has(loc);
 
-      const ok = matchQ && matchLoc && matchAmt;
+      const ok = matchQ && matchLoc;
       r.style.display = ok ? "" : "none";
-      if (ok) visible.push(r);
-    }
 
-    // sort visible
+      // hide its detail row if group hidden
+      const next = r.nextElementSibling;
+      if (next && next.classList.contains("detail-row")) {
+        if (!ok) next.style.display = "none";
+      }
+
+      if (ok) visible.push(r);
+    });
+
+    // sort visible (reorder DOM)
     const by = $sortBy.value;
     const dir = $sortDir.value === "desc" ? -1 : 1;
 
     visible.sort((a, b) => {
       if (by === "amount") return (parseAmt(a.dataset.amount) - parseAmt(b.dataset.amount)) * dir;
-      const va = (by === "location") ? (a.dataset.locationL || "") : (a.dataset.customer || "");
-      const vb = (by === "location") ? (b.dataset.locationL || "") : (b.dataset.customer || "");
-      return va.localeCompare(vb) * dir;
+      if (by === "customer") return (a.dataset.customer || "").localeCompare((b.dataset.customer || "")) * dir;
+      return (a.dataset.locationL || "").localeCompare((b.dataset.locationL || "")) * dir;
     });
 
-    // reorder DOM (only real rows)
-    const hidden = dataRows.filter((r) => r.style.display === "none");
-    tbody.innerHTML = "";
-    visible.forEach((r) => tbody.appendChild(r));
-    hidden.forEach((r) => tbody.appendChild(r));
+    // rebuild tbody keeping group/detail pairs
+    const mapDetail = new Map();
+    groupRows.forEach((gr) => {
+      const dr = gr.nextElementSibling;
+      if (dr && dr.classList.contains("detail-row")) mapDetail.set(gr, dr);
+    });
 
-    // show/hide noResults row
-    noResultsRow.style.display = visible.length === 0 ? "" : "none";
-    tbody.appendChild(noResultsRow);
+    // Keep hidden groups (not visible) after visible list
+    const hidden = groupRows.filter(r => r.style.display === "none");
+
+    tbody.innerHTML = "";
+    [...visible, ...hidden].forEach((gr) => {
+      tbody.appendChild(gr);
+      const dr = mapDetail.get(gr);
+      if (dr) tbody.appendChild(dr);
+    });
 
     // stats
-    const totalOrders = visible.length;
-    const totalAmt = visible.reduce((sum, r) => sum + parseAmt(r.dataset.amount), 0);
-
-    $statCount.textContent = `Orders: ${totalOrders}`;
-    $statTotal.textContent = `Total: ₹${fmtINR(totalAmt)}`;
+    const visibleTotal = visible.reduce((sum, r) => sum + parseAmt(r.dataset.amount), 0);
+    $statCount.textContent = `Customers: ${visible.length}`;
+    $statTotal.textContent = `Total: ₹${fmtINR(visibleTotal)}`;
   };
 
   const debounce = (fn, ms) => {
     let t;
-    return (...args) => {
-      clearTimeout(t);
-      t = setTimeout(() => fn(...args), ms);
-    };
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
   };
-
   const applyDebounced = debounce(apply, 150);
 
   $q.addEventListener("input", applyDebounced);
-  $loc.addEventListener("change", apply);
-  $minAmt.addEventListener("input", applyDebounced);
-  $maxAmt.addEventListener("input", applyDebounced);
   $sortBy.addEventListener("change", apply);
   $sortDir.addEventListener("change", apply);
 
   $resetBtn.addEventListener("click", () => {
     $q.value = "";
-    $loc.value = "ALL";
-    $minAmt.value = "";
-    $maxAmt.value = "";
-    $sortBy.value = "customer";
+    selectedLocs = new Set(); // ALL
+    renderLocDropdown();
+    renderLocDisplay();
+    $sortBy.value = "location";
     $sortDir.value = "asc";
     apply();
   });
