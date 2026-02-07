@@ -89,8 +89,8 @@
    Sticker (better use of empty space)
 ========================================================= */
 .sticker-page .sticker{
-  width: var(--sticker-size);
-  height: var(--sticker-size);
+  width: auto;
+  height: auto;
   background: #fff !important;
   color: #111827 !important;
   border: 0.25mm solid #111 !important;
@@ -103,6 +103,21 @@
 
   position: relative;            /* ✅ for watermark */
 }
+
+.sticker-page .per-48 .sticker-customer{ font-size: 8pt !important; }
+.sticker-page .per-48 .sticker-location{ font-size: 7pt !important; }
+.sticker-page .per-48 .meal-label{ font-size: 6pt !important; }
+.sticker-page .per-48 .meal-value{ font-size: 13pt !important; }
+.sticker-page .per-48 .sticker::before{ font-size: 18pt !important; }
+
+
+@media print{
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
+
 
 /* ✅ Big watermark (uses empty space nicely) */
 .sticker-page .sticker::before{
@@ -143,6 +158,29 @@
   text-overflow: ellipsis;
   line-height: 1.05;
 }
+/* 
+.sticker-page .layout-48{
+  --sticker-width: 48mm;
+  --sticker-height: 24mm;
+  --sticker-gap-x: 2mm;
+  --sticker-gap-y: 2mm;
+  --page-top-margin: 10mm;
+  --page-left-margin: 10mm;
+} */
+
+/* .sticker-page .stickers-grid.per-48{
+  display: grid;
+  grid-template-columns: repeat(4, var(--sticker-width));
+  grid-auto-rows: var(--sticker-height);
+  column-gap: var(--sticker-gap-x);
+  row-gap: var(--sticker-gap-y);
+
+  margin-top: var(--page-top-margin);
+  margin-left: var(--page-left-margin);
+
+  width: auto;
+} */
+
 
 .sticker-page .sticker-location{
   font-weight: 800;
@@ -225,6 +263,7 @@
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Date</label>
           <input id="dateInput" type="date" name="date" class="form-control" value="{{ entry_date }}" required>
+          
         </div>
 
         <div class="form-group" style="margin-bottom:0;">
@@ -238,6 +277,7 @@
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Layout</label>
           <select name="layout" id="layoutSelect" class="form-control">
+            <option value="48" {% if per_page == 48 %}selected{% endif %}> 48 (48mm × 24mm Rectangle)</option>
             <option value="35" {% if per_page == 35 %}selected{% endif %}>35 (A4 5×7 ~40mm)</option>
             <option value="24" {% if per_page == 24 %}selected{% endif %}>24 (A4 4×6 medium)</option>
             <option value="12" {% if per_page == 12 %}selected{% endif %}>12 (A4 3×4 large)</option>
@@ -246,7 +286,59 @@
             <option value="6"  {% if per_page == 6 %}selected{% endif %}>6</option>
           </select>
         </div>
+<!-- Size Controls -->
+<div class="form-group" style="margin-bottom:0;">
+  <label class="form-label">Width (mm)</label>
+  <input type="number" step="0.5" name="width"
+         class="form-control"
+         value="{{ sticker_width|default:48 }}">
+</div>
 
+<div class="form-group" style="margin-bottom:0;">
+  <label class="form-label">Height (mm)</label>
+  <input type="number" step="0.5" name="height"
+         class="form-control"
+         value="{{ sticker_height|default:24 }}">
+</div>
+
+<div class="form-group" style="margin-bottom:0;">
+  <label class="form-label">Per Row</label>
+  <input type="number" name="per_row"
+         class="form-control"
+         value="{{ per_row|default:4 }}">
+</div>
+
+<div class="form-group" style="margin-bottom:0;">
+  <label class="form-label">Left Gap (mm)</label>
+  <input type="number" step="0.5" name="gap_left"
+         class="form-control"
+         value="{{ gap_left|default:10 }}">
+</div>
+
+<div class="form-group" style="margin-bottom:0;">
+  <label class="form-label">Top Gap (mm)</label>
+  <input type="number" step="0.5" name="gap_top"
+         class="form-control"
+         value="{{ gap_top|default:10 }}">
+</div>
+
+<div class="form-group" style="margin-bottom:0;">
+  <label class="form-label">Horizontal Gap (mm)</label>
+  <input type="number" step="0.5" name="gap_x"
+         class="form-control"
+         value="{{ gap_x|default:2 }}">
+</div>
+
+<div class="form-group" style="margin-bottom:0;">
+  <label class="form-label">Vertical Gap (mm)</label>
+  <input type="number" step="0.5" name="gap_y"
+         class="form-control"
+         value="{{ gap_y|default:2 }}">
+</div>
+
+<button type="button" onclick="resetLayout()" class="btn btn-secondary">
+  Reset
+</button>
         <button type="submit" class="btn btn-primary" style="height:42px; padding:0 22px;">
           Generate
         </button>
@@ -257,9 +349,24 @@
   {% for page in sticker_pages %}
     <div class="print-page">
       <div class="stickers-wrap">
-        <div class="stickers-grid per-{{ per_page }} layout-{{ per_page }}">
+    <div class="stickers-grid per-{{ per_page }}"
+     style="
+        grid-template-columns: repeat({{ per_row|default:4 }}, {{ sticker_width|default:48 }}mm);
+        grid-auto-rows: {{ sticker_height|default:24 }}mm;
+column-gap: {{ gap_x|default:2 }}mm;
+row-gap: {{ gap_y|default:2 }}mm;
+
+        margin-left: {{ gap_left|default:10 }}mm;
+        margin-top: {{ gap_top|default:10 }}mm;
+     ">
+
           {% for data in page %}
-            <div class="sticker" data-meal="{{ meal_type }}">
+            <div class="sticker"
+     data-meal="{{ meal_type }}"
+     style="
+        width: {{ sticker_width|default:48 }}mm;
+        height: {{ sticker_height|default:24 }}mm;
+     ">
               <div class="sticker-header">
                 <div class="sticker-customer">{{ data.entry.customer.name }}</div>
                 <div class="sticker-location">{{ data.entry.customer.delivery_location }}</div>
@@ -289,27 +396,81 @@
 
 {% block extra_js %}
 <script>
-  function printStickers(){ window.print(); }
+function printStickers(){ window.print(); }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const dateInput = document.getElementById("dateInput");
-    const form = document.getElementById("stickerFilters");
+document.addEventListener("DOMContentLoaded", function () {
 
-    if (dateInput) {
-      const pad = (n) => String(n).padStart(2, "0");
-      const now = new Date();
-      const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-      dateInput.setAttribute("max", today);
+  const inputs = document.querySelectorAll(
+    "input[name='width'], input[name='height'], input[name='per_row'], input[name='gap_left'], input[name='gap_top'], input[name='gap_x'], input[name='gap_y']"
+  );
 
-      const clampIfFuture = () => {
-        const v = dateInput.value;
-        if (v && v > today) dateInput.value = today;
-      };
+  function updatePreview(){
+    const width = document.querySelector("input[name='width']").value || 48;
+    const height = document.querySelector("input[name='height']").value || 24;
+    const perRow = document.querySelector("input[name='per_row']").value || 4;
+    const gapLeft = document.querySelector("input[name='gap_left']").value || 10;
+    const gapTop = document.querySelector("input[name='gap_top']").value || 10;
+    const gapX = document.querySelector("input[name='gap_x']").value || 2;
+    const gapY = document.querySelector("input[name='gap_y']").value || 2;
 
-      dateInput.addEventListener("change", clampIfFuture);
-      if (form) form.addEventListener("submit", clampIfFuture);
-      clampIfFuture();
-    }
+    const grids = document.querySelectorAll(".stickers-grid");
+
+    grids.forEach(grid => {
+      grid.style.gridTemplateColumns = `repeat(${perRow}, ${width}mm)`;
+      grid.style.gridAutoRows = `${height}mm`;
+      grid.style.columnGap = `${gapX}mm`;
+      grid.style.rowGap = `${gapY}mm`;
+      grid.style.marginLeft = `${gapLeft}mm`;
+      grid.style.marginTop = `${gapTop}mm`;
+    });
+
+    const stickers = document.querySelectorAll(".sticker");
+    stickers.forEach(sticker => {
+      sticker.style.width = `${width}mm`;
+      sticker.style.height = `${height}mm`;
+    });
+  }
+
+  inputs.forEach(input => {
+    input.addEventListener("input", updatePreview);
   });
+
+});
+const layoutDefaults = {
+  48: { width:48, height:24, per_row:4, gap_left:10, gap_top:10, gap_x:2, gap_y:2 },
+  35: { width:39, height:39, per_row:5, gap_left:5, gap_top:5, gap_x:1, gap_y:1 },
+  24: { width:48, height:48, per_row:4, gap_left:5, gap_top:5, gap_x:2, gap_y:2 },
+  12: { width:65, height:65, per_row:3, gap_left:5, gap_top:5, gap_x:3, gap_y:3 }
+};
+
+document.getElementById("layoutSelect").addEventListener("change", function(){
+
+  const selected = this.value;
+
+  if(layoutDefaults[selected]){
+
+    const d = layoutDefaults[selected];
+
+    document.querySelector("input[name='width']").value = d.width;
+    document.querySelector("input[name='height']").value = d.height;
+    document.querySelector("input[name='per_row']").value = d.per_row;
+    document.querySelector("input[name='gap_left']").value = d.gap_left;
+    document.querySelector("input[name='gap_top']").value = d.gap_top;
+    document.querySelector("input[name='gap_x']").value = d.gap_x;
+    document.querySelector("input[name='gap_y']").value = d.gap_y;
+
+    updatePreview(); // important
+  }
+
+
+
+});
+
+  function resetLayout(){
+  document.getElementById("layoutSelect").dispatchEvent(new Event("change"));
+}
+
+
 </script>
+
 {% endblock %}

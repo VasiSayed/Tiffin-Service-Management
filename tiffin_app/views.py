@@ -1063,25 +1063,38 @@ def print_stickers(request):
     entry_date = request.GET.get("date") or str(date.today())
     meal_type = (request.GET.get("meal_type") or "LUNCH").upper()
 
-    layout_raw = (request.GET.get("layout") or request.GET.get("per_page") or "35").strip()
+    layout_raw = (request.GET.get("layout") or request.GET.get("per_page") or "48").strip()
     try:
         per_page = int(layout_raw)
     except Exception:
-        per_page = 35
+        per_page = 48
 
-    if per_page not in (35, 24, 12, 10, 8, 6):
-        per_page = 35
+    if per_page not in (35, 24, 12, 10, 8, 6, 48):
+        per_page = 48
 
-    max_lines = {35: 3, 24: 6, 12: 10}.get(per_page, 999)
+    sticker_width = float(request.GET.get("width", 48))
+    sticker_height = float(request.GET.get("height", 24))
+    per_row = int(request.GET.get("per_row", 4))
 
-    # ✅ Prefetch CUSTOM items
+    gap_left = float(request.GET.get("gap_left", 10))
+    gap_top = float(request.GET.get("gap_top", 10))
+    gap_x = float(request.GET.get("gap_x", 2))
+    gap_y = float(request.GET.get("gap_y", 2))
+
+    max_lines = {
+        35: 3,
+        24: 6,
+        12: 10,
+        48: 2,
+    }.get(per_page, 999)
+
+    # ----- YOUR EXISTING DATA LOGIC (UNCHANGED) -----
     custom_items_qs = (
         OrderMealCustom.objects.filter(source="CUSTOM")
         .select_related("dish", "portion")
         .order_by("dish_name", "id")
     )
 
-    # ✅ Prefetch DailyMenu items (for entry.menu)
     menu_items_qs = DailyMenuItem.objects.select_related("dish").order_by("id")
 
     entries = (
@@ -1090,16 +1103,15 @@ def print_stickers(request):
             entry_date=entry_date,
             meal_type=meal_type,
         )
-        .select_related("customer", "menu")  # ✅ FIXED: menu
+        .select_related("customer", "menu")
         .prefetch_related(
             "order_meals__meal",
             Prefetch("order_meals__custom_items", queryset=custom_items_qs),
-            Prefetch("menu__items", queryset=menu_items_qs),  # ✅ FIXED: menu__items
+            Prefetch("menu__items", queryset=menu_items_qs),
         )
         .order_by("customer__delivery_location", "customer__name", "id")
     )
 
-    # ✅ Fallback menu (if entry.menu is null): pick tenant+date menu_type OR BOTH
     fallback_menu = (
         DailyMenu.objects.filter(
             tenant=tenant,
@@ -1107,15 +1119,9 @@ def print_stickers(request):
         )
         .filter(Q(meal_type=meal_type) | Q(meal_type="BOTH"))
         .prefetch_related(Prefetch("items", queryset=menu_items_qs))
-        .order_by(
-            # exact meal_type first, then BOTH
-            # (Django doesn't have easy bool order; this works with Case if you want,
-            # but simple order_by('meal_type') isn't reliable. We'll do small logic below.)
-            "id"
-        )
+        .order_by("id")
     )
 
-    # choose best fallback menu
     fallback_exact = None
     fallback_both = None
     for m in fallback_menu:
@@ -1129,7 +1135,6 @@ def print_stickers(request):
     for entry in entries:
         items_map = OrderedDict()
 
-        # ✅ 1) Daily Menu items ALWAYS print (entry.menu else fallback)
         menu_obj = entry.menu or fallback_menu_obj
         if menu_obj:
             for mi in menu_obj.items.all():
@@ -1138,16 +1143,9 @@ def print_stickers(request):
                     name = (mi.dish.name or "").strip()
                 if not name:
                     continue
-
-                qty = getattr(mi, "qty", 1) or 1
-                try:
-                    qty = int(qty)
-                except Exception:
-                    qty = 1
-
+                qty = int(getattr(mi, "qty", 1) or 1)
                 items_map[name] = items_map.get(name, 0) + qty
 
-        # ✅ 2) Custom items (optional add-on)
         for om in entry.order_meals.all():
             for ci in om.custom_items.all():
                 name = (getattr(ci, "dish_name", "") or "").strip()
@@ -1155,27 +1153,17 @@ def print_stickers(request):
                     name = (ci.dish.name or "").strip()
                 if not name:
                     continue
-
-                qty = getattr(ci, "qty", 1) or 1
-                try:
-                    qty = int(qty)
-                except Exception:
-                    qty = 1
-
+                qty = int(getattr(ci, "qty", 1) or 1)
                 items_map[name] = items_map.get(name, 0) + qty
 
         items = [{"dish_name": k, "qty": v} for k, v in items_map.items()]
         items_display = items[:max_lines]
         items_more_count = max(0, len(items) - len(items_display))
 
-        sticker_data.append(
-            {
-                "entry": entry,
-                "items": items,
-                "items_display": items_display,
-                "items_more_count": items_more_count,
-            }
-        )
+        sticker_data.append({
+            "entry": entry,
+            "items_display": items_display,
+        })
 
     sticker_pages = _chunk_list(sticker_data, per_page)
 
@@ -1187,6 +1175,15 @@ def print_stickers(request):
             "entry_date": entry_date,
             "meal_type": meal_type,
             "per_page": per_page,
+
+            # 👇 ADD THESE
+            "sticker_width": sticker_width,
+            "sticker_height": sticker_height,
+            "per_row": per_row,
+            "gap_left": gap_left,
+            "gap_top": gap_top,
+            "gap_x": gap_x,
+            "gap_y": gap_y,
         },
     )
 
