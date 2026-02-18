@@ -110,9 +110,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET
 from .models import (
-    Customer, Dish, DishPortion, Meal, MealDishPortion,
-    DailyEntry, OrderMeal, OrderMealCustom, Payment,
-    ExpenseCategory, ExpenseItem
+    Customer,
+    CustomerLocation,
+    Dish,
+    DishPortion,
+    Meal,
+    MealDishPortion,
+    DailyEntry,
+    OrderMeal,
+    OrderMealCustom,
+    Payment,
+    ExpenseCategory,
+    ExpenseItem,
 )
 from .forms_expenses import ExpenseCategoryForm, ExpenseItemForm
 
@@ -249,22 +258,53 @@ def customer_add(request):
     if request.method == "POST":
         tenant = _tenant(request)
         meal_preference = request.POST.get("meal_preference") or "BOTH"
+        food_type = request.POST.get("food_type") or "VEG"
 
-        Customer.objects.create(
+        # multiple locations
+        raw_locations = [x.strip() for x in request.POST.getlist("locations") if x.strip()]
+        try:
+            default_idx = int(request.POST.get("default_location_index", "0"))
+        except (TypeError, ValueError):
+            default_idx = 0
+
+        default_label = ""
+        if raw_locations:
+            if default_idx < 0 or default_idx >= len(raw_locations):
+                default_idx = 0
+            default_label = raw_locations[default_idx]
+
+        customer = Customer.objects.create(
             tenant=tenant,
             name=request.POST["name"],
             contact_number=request.POST.get("contact_number", ""),
             email=request.POST.get("email") or None,
-            delivery_location=request.POST["delivery_location"],
+            delivery_location=default_label,
             meal_preference=meal_preference,  # ✅ NEW
+            food_type=food_type,
             daily_customer=request.POST.get("daily_customer") == "on",
             address=request.POST.get("address", ""),
             is_active=request.POST.get("is_active") == "on",
         )
+
+        # create location rows
+        for idx, label in enumerate(raw_locations):
+            CustomerLocation.objects.create(
+                customer=customer,
+                label=label,
+                is_default=(idx == default_idx),
+            )
+
         messages.success(request, "Customer added successfully")
         return redirect("customer_list")
 
-    return render(request, "tiffin_app/customers/form.html")
+    return render(
+        request,
+        "tiffin_app/customers/form.html",
+        {
+            "customer": None,
+            "locations": [],
+        },
+    )
 
 
 @login_required
@@ -277,15 +317,54 @@ def customer_edit(request, pk):
         customer.contact_number = request.POST.get("contact_number", "")
         customer.email = request.POST.get("email") or None
         customer.meal_preference = request.POST.get("meal_preference") or "BOTH"
-        customer.delivery_location = request.POST["delivery_location"]
+        customer.food_type = request.POST.get("food_type") or "VEG"
+        # locations
+        raw_locations = [x.strip() for x in request.POST.getlist("locations") if x.strip()]
+        try:
+            default_idx = int(request.POST.get("default_location_index", "0"))
+        except (TypeError, ValueError):
+            default_idx = 0
+
+        default_label = ""
+        if raw_locations:
+            if default_idx < 0 or default_idx >= len(raw_locations):
+                default_idx = 0
+            default_label = raw_locations[default_idx]
+
+        customer.delivery_location = default_label
         customer.daily_customer = request.POST.get("daily_customer") == "on"  # ✅ ADD
         customer.address = request.POST.get("address", "")
         customer.is_active = request.POST.get("is_active") == "on"
         customer.save()
+
+        # replace locations for simplicity
+        customer.locations.all().delete()
+        for idx, label in enumerate(raw_locations):
+            CustomerLocation.objects.create(
+                customer=customer,
+                label=label,
+                is_default=(idx == default_idx),
+            )
+
         messages.success(request, "Customer updated successfully")
         return redirect("customer_list")
 
-    return render(request, "tiffin_app/customers/form.html", {"customer": customer})
+    # existing locations (or fallback from single delivery_location)
+    loc_qs = list(customer.locations.all())
+    if loc_qs:
+        locations = loc_qs
+    else:
+        base_label = (customer.delivery_location or "").strip()
+        locations = [{"id": None, "label": base_label, "is_default": True}] if base_label else []
+
+    return render(
+        request,
+        "tiffin_app/customers/form.html",
+        {
+            "customer": customer,
+            "locations": locations,
+        },
+    )
 
 
 @login_required
@@ -629,7 +708,8 @@ def daily_entry_list(request):
         DailyEntry.objects
         .filter(tenant=tenant, entry_date=entry_date)
         .select_related("customer", "menu")
-        .order_by("customer__delivery_location", "customer__name", "-created_at", "-id")
+        # sort primarily by per-entry location snapshot, then by customer
+        .order_by("delivery_location", "customer__name", "-created_at", "-id")
     )
 
     # ✅ group by customer
@@ -647,7 +727,10 @@ def daily_entry_list(request):
         c = e.customer
         g = grouped[c.id]
         g["customer"] = c
-        g["location"] = (getattr(c, "delivery_location", "") or "").strip()
+        # use per-entry snapshot when available, otherwise fallback to customer's master location
+        entry_loc = (getattr(e, "delivery_location", "") or getattr(c, "delivery_location", "") or "").strip()
+        if entry_loc and not g["location"]:
+            g["location"] = entry_loc
         g["type_label"] = "Daily" if getattr(c, "daily_customer", False) else "Occasional"
         g["total_amount"] += float(e.total_amount or 0)
         g["entries"].append(e)
@@ -704,6 +787,9 @@ def daily_entry_add(request):
             customer=customer,
             entry_date=entry_date_post,
             meal_type=meal_type_post,
+            defaults={
+                "delivery_location": (getattr(customer, "delivery_location", "") or "").strip(),
+            },
         )
 
         if created:
@@ -1026,9 +1112,18 @@ def daily_entry_bulk_create(request):
     existing_map = {e.customer_id: e for e in existing}
 
     to_create = []
+    loc_map = {c.id: (c.delivery_location or "").strip() for c in customers}
     for cid in cust_ids:
         if cid not in existing_map:
-            to_create.append(DailyEntry(tenant=tenant, customer_id=cid, entry_date=entry_date, meal_type=meal_type))
+            to_create.append(
+                DailyEntry(
+                    tenant=tenant,
+                    customer_id=cid,
+                    entry_date=entry_date,
+                    meal_type=meal_type,
+                    delivery_location=loc_map.get(cid, ""),
+                )
+            )
 
     if to_create:
         DailyEntry.objects.bulk_create(to_create)
@@ -1109,7 +1204,8 @@ def print_stickers(request):
             Prefetch("order_meals__custom_items", queryset=custom_items_qs),
             Prefetch("menu__items", queryset=menu_items_qs),
         )
-        .order_by("customer__delivery_location", "customer__name", "id")
+        # sort by per-entry snapshot location, then customer
+        .order_by("delivery_location", "customer__name", "id")
     )
 
     fallback_menu = (
@@ -2778,12 +2874,17 @@ def daily_entry_register(request):
                     print("menu lookup failed:", ex)
                     menu_obj = None
 
+            # selected location (optional) – snapshot into DailyEntry only (do not override customer)
+            selected_location = (request.POST.get(f"location_{c.id}") or "").strip()
+            entry_location = selected_location or (getattr(c, "delivery_location", "") or "").strip()
+
             # ✅ ALWAYS CREATE NEW ENTRY (no update)
             entry = DailyEntry.objects.create(
                 tenant=tenant,
                 customer=c,
                 entry_date=d,
                 meal_type=row_meal_type,
+                delivery_location=entry_location,
                 menu=menu_obj,
                 total_amount=Decimal("0.00"),
             )
@@ -2822,6 +2923,15 @@ def daily_entry_register(request):
         if pref not in ("LUNCH", "DINNER"):
             pref = "LUNCH"
 
+        # build locations list (multiple per customer)
+        loc_qs = list(c.locations.all())
+        if loc_qs:
+            locs = loc_qs
+        else:
+            # fallback to legacy single delivery_location
+            base_label = (getattr(c, "delivery_location", "") or "").strip()
+            locs = [{"id": None, "label": base_label, "is_default": True}] if base_label else []
+
         rows.append({
             "customer": c,
             "type_label": "Daily" if getattr(c, "daily_customer", False) else "Occasional",
@@ -2832,6 +2942,7 @@ def daily_entry_register(request):
             "selected_meal_ids": [],
             "qty": 1,
             "amount": "0",
+            "locations": locs,
         })
 
     return render(

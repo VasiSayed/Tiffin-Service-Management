@@ -152,7 +152,8 @@ tbody tr.table-success.selected{ background:#d4edda !important; }
             <th>Customer</th>
             <th style="width:90px;">Type</th>
             <th style="width:100px;">Preferred</th>
-            <th style="width:140px;">Location</th>
+            <th style="width:100px;">Food</th>
+            <th style="width:180px;">Location</th>
             <th style="width:100px;">Meal Type</th>
             <th style="min-width:180px;">Daily Menu</th>
             <th style="min-width:240px;">Meal (multi)</th>
@@ -189,7 +190,28 @@ tbody tr.table-success.selected{ background:#d4edda !important; }
               </span>
             </td>
 
-            <td title="{{ r.customer.delivery_location }}">{{ r.customer.delivery_location }}</td>
+            <td>
+              {% if r.customer.food_type == "BOTH" %}
+                <span class="badge badge-secondary">Veg &amp; Non-Veg</span>
+              {% elif r.customer.food_type == "NON_VEG" %}
+                <span class="badge badge-danger">Non-Veg</span>
+              {% else %}
+                <span class="badge badge-success">Veg</span>
+              {% endif %}
+            </td>
+
+            <td onclick="event.stopPropagation()">
+              <select name="location_{{ r.customer.id }}" class="form-control form-control-sm">
+                {% for loc in r.locations %}
+                  {% with lbl=loc.label %}
+                  <option value="{{ lbl }}"
+                          {% if loc.is_default or lbl == r.customer.delivery_location %}selected{% endif %}>
+                    {{ lbl }}
+                  </option>
+                  {% endwith %}
+                {% endfor %}
+              </select>
+            </td>
 
             <td onclick="event.stopPropagation()">
               <select name="meal_type_{{ r.customer.id }}" class="form-control form-control-sm row-meal-type">

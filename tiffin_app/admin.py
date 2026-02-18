@@ -45,7 +45,7 @@ class MealDishPortionAdmin(admin.ModelAdmin):
 
 @admin.register(DailyEntry)
 class DailyEntryAdmin(admin.ModelAdmin):
-    list_display = ['customer', 'entry_date', 'meal_type', 'total_amount', 'tenant']
+    list_display = ['customer', 'entry_date', 'meal_type', 'delivery_location', 'total_amount', 'tenant']
     list_filter = ['entry_date', 'meal_type', 'tenant']
     search_fields = ['customer__name']
     date_hierarchy = 'entry_date'

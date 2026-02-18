@@ -369,7 +369,9 @@ row-gap: {{ gap_y|default:2 }}mm;
      ">
               <div class="sticker-header">
                 <div class="sticker-customer">{{ data.entry.customer.name }}</div>
-                <div class="sticker-location">{{ data.entry.customer.delivery_location }}</div>
+                <div class="sticker-location">
+                  {{ data.entry.delivery_location|default:data.entry.customer.delivery_location }}
+                </div>
               </div>
 
               <div class="sticker-body">

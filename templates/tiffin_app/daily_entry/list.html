@@ -148,6 +148,7 @@
                       <thead style="background:#f0f0f0;">
                         <tr>
                           <th style="width:120px;">Meal Type</th>
+                          <th style="min-width:160px;">Location</th>
                           <th>Menu</th>
                           <th style="width:140px;">Amount</th>
                           <th style="width:180px;">Created</th>
@@ -164,13 +165,16 @@
                               <span class="badge badge-warning">Dinner</span>
                             {% endif %}
                           </td>
+                          <td>
+                            {{ e.delivery_location|default:e.customer.delivery_location }}
+                          </td>
                           <td>{% if e.menu %}{{ e.menu }}{% else %}-{% endif %}</td>
                           <td>₹{{ e.total_amount }}</td>
                           <td>{{ e.created_at }}</td>
                           <td><a href="{% url 'daily_entry_detail' e.pk %}" class="btn btn-sm btn-outline-primary">Open</a></td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="5" class="text-center">No entries</td></tr>
+                        <tr><td colspan="6" class="text-center">No entries</td></tr>
                         {% endfor %}
                       </tbody>
                     </table>

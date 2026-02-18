@@ -69,6 +69,12 @@ class Customer(models.Model):
         ("BOTH", "Both"),
     ]
 
+    FOOD_TYPE_CHOICES = [
+        ("VEG", "Veg"),
+        ("NON_VEG", "Non-Veg"),
+        ("BOTH", "Both"),
+    ]
+
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='customers')
     name = models.CharField(max_length=200)
     contact_number = models.CharField(max_length=20, blank=True)
@@ -81,6 +87,11 @@ class Customer(models.Model):
         choices=MEAL_PREF_CHOICES,
         default="BOTH",
     )
+    food_type = models.CharField(
+        max_length=10,
+        choices=FOOD_TYPE_CHOICES,
+        default="VEG",
+    )
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -90,6 +101,22 @@ class Customer(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.delivery_location}"
+
+
+class CustomerLocation(models.Model):
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name="locations",
+    )
+    label = models.CharField(max_length=255)
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["label", "id"]
+
+    def __str__(self):
+        return f"{self.customer.name} - {self.label}"
 
 
 class Dish(models.Model):
@@ -193,6 +220,9 @@ class DailyEntry(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='orders')
     entry_date = models.DateField()
     meal_type = models.CharField(max_length=10, choices=MEAL_TYPE_CHOICES)
+
+    # Snapshot of location used for this entry (do not override Customer.delivery_location)
+    delivery_location = models.CharField(max_length=500, blank=True, default="")
 
     menu = models.ForeignKey(
         "DailyMenu",
