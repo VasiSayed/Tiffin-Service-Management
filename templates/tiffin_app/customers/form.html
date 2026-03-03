@@ -31,50 +31,105 @@
           </div>
         </div>
 
-        <!-- Delivery Locations (multiple with one default) -->
+        <!-- Delivery Locations (multiple with per-meal defaults) -->
         <div class="form-group">
           <label class="form-label">Delivery Locations *</label>
 
           <div id="locations-wrapper">
             {% if locations %}
               {% for loc in locations %}
-              <div class="location-row" style="display:flex; gap:8px; margin-bottom:6px; align-items:center;">
+              <div class="location-row" style="display:flex; gap:8px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
                 <input
                   type="text"
                   name="locations"
                   class="form-control"
-                  style="flex:1;"
+                  style="flex:1 1 260px;"
                   value="{{ loc.label }}"
                   placeholder="Enter delivery location"
                   required
                 >
-                <label style="white-space:nowrap; font-size:13px; margin:0 4px;">
-                  <input
-                    type="radio"
-                    name="default_location_index"
-                    value="{{ forloop.counter0 }}"
-                    {% if loc.is_default or forloop.first %}checked{% endif %}
-                  >
-                  Default
-                </label>
+                <!-- Meal mapping -->
+                <select name="location_meal_type" class="form-control"
+                        style="flex:0 0 130px; min-width:120px; max-width:130px;">
+                  {% with mt=loc.meal_type|default:"BOTH" %}
+                  <option value="BOTH" {% if mt == "BOTH" %}selected{% endif %}>Both</option>
+                  <option value="LUNCH" {% if mt == "LUNCH" %}selected{% endif %}>Lunch</option>
+                  <option value="DINNER" {% if mt == "DINNER" %}selected{% endif %}>Dinner</option>
+                  {% endwith %}
+                </select>
+
+                <!-- Per-meal defaults (compact pill-style) -->
+                <div class="location-flags">
+                  <label class="flag-pill">
+                    <input
+                      type="checkbox"
+                      name="default_location_lunch"
+                      value="{{ forloop.counter0 }}"
+                      {% if loc.is_default_lunch %}checked{% endif %}
+                    >
+                    <span>L</span>
+                  </label>
+
+                  <label class="flag-pill">
+                    <input
+                      type="checkbox"
+                      name="default_location_dinner"
+                      value="{{ forloop.counter0 }}"
+                      {% if loc.is_default_dinner %}checked{% endif %}
+                    >
+                    <span>D</span>
+                  </label>
+
+                  <!-- Legacy single default (for old code / ordering) -->
+                  <label class="flag-pill flag-main">
+                    <input
+                      type="radio"
+                      name="default_location_index"
+                      value="{{ forloop.counter0 }}"
+                      {% if loc.is_default or forloop.first %}checked{% endif %}
+                    >
+                    <span>★</span>
+                  </label>
+                </div>
+
                 <button type="button" class="btn btn-sm btn-outline-danger remove-location">&times;</button>
               </div>
               {% endfor %}
             {% else %}
-              <div class="location-row" style="display:flex; gap:8px; margin-bottom:6px; align-items:center;">
+              <div class="location-row" style="display:flex; gap:8px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
                 <input
                   type="text"
                   name="locations"
                   class="form-control"
-                  style="flex:1;"
+                  style="flex:1 1 260px;"
                   value="{{ customer.delivery_location|default:'' }}"
                   placeholder="Enter delivery location"
                   required
                 >
-                <label style="white-space:nowrap; font-size:13px; margin:0 4px;">
-                  <input type="radio" name="default_location_index" value="0" checked>
-                  Default
-                </label>
+                <select name="location_meal_type" class="form-control"
+                        style="flex:0 0 130px; min-width:120px; max-width:130px;">
+                  <option value="BOTH" selected>Both</option>
+                  <option value="LUNCH">Lunch</option>
+                  <option value="DINNER">Dinner</option>
+                </select>
+
+                <div class="location-flags">
+                  <label class="flag-pill">
+                    <input type="checkbox" name="default_location_lunch" value="0" checked>
+                    <span>L</span>
+                  </label>
+
+                  <label class="flag-pill">
+                    <input type="checkbox" name="default_location_dinner" value="0" checked>
+                    <span>D</span>
+                  </label>
+
+                  <label class="flag-pill flag-main">
+                    <input type="radio" name="default_location_index" value="0" checked>
+                    <span>★</span>
+                  </label>
+                </div>
+
                 <button type="button" class="btn btn-sm btn-outline-danger remove-location">&times;</button>
               </div>
             {% endif %}
@@ -107,18 +162,33 @@
             </select>
           </div>
 
-          <div class="form-group" style="display:flex; align-items:flex-end;">
-            <label class="toggle" style="margin:0;">
-              <input id="dailyCustomer" type="checkbox" name="daily_customer"
-                {% if customer %}
-                  {% if customer.daily_customer %}checked{% endif %}
-                {% else %}
-                  checked
-                {% endif %}
-              >
-              <span class="track"><span class="thumb"></span></span>
-              <span class="text">Daily Customer</span>
-            </label>
+          <div class="form-group">
+            <label class="form-label">Daily Customer</label>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <label class="toggle" style="margin:0;">
+                <input id="dailyLunch" type="checkbox" name="daily_lunch"
+                  {% if customer %}
+                    {% if customer.daily_lunch %}checked{% endif %}
+                  {% else %}
+                    checked
+                  {% endif %}
+                >
+                <span class="track"><span class="thumb"></span></span>
+                <span class="text">Lunch</span>
+              </label>
+
+              <label class="toggle" style="margin:0;">
+                <input id="dailyDinner" type="checkbox" name="daily_dinner"
+                  {% if customer %}
+                    {% if customer.daily_dinner %}checked{% endif %}
+                  {% else %}
+                    checked
+                  {% endif %}
+                >
+                <span class="track"><span class="thumb"></span></span>
+                <span class="text">Dinner</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -168,6 +238,43 @@
   .location-row .remove-location{
     padding: 4px 8px;
   }
+
+  .location-flags{
+    display:flex;
+    gap:4px;
+    align-items:center;
+    flex-wrap:nowrap;
+  }
+  .flag-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    border:1px solid #ced4da;
+    background:#f8f9fa;
+    padding:2px 6px;
+    font-size:11px;
+    cursor:pointer;
+    color:#495057;
+  }
+  .flag-pill input{
+    display:none;
+  }
+  .flag-pill span{
+    font-weight:600;
+    min-width:14px;
+    text-align:center;
+  }
+  .flag-pill input:checked + span{
+    background:#007bff;
+    color:#fff;
+    border-radius:999px;
+    padding:1px 6px;
+  }
+  .flag-pill.flag-main input:checked + span{
+    background:#ffc107;
+    color:#212529;
+  }
 </style>
 
 <script>
@@ -197,14 +304,29 @@
         type="text"
         name="locations"
         class="form-control"
-        style="flex:1;"
+        style="flex:1 1 260px;"
         placeholder="Enter delivery location"
         required
       >
-      <label style="white-space:nowrap; font-size:13px; margin:0 4px;">
-        <input type="radio" name="default_location_index" value="${index}">
-        Default
-      </label>
+      <select name="location_meal_type" class="form-control" style="flex:0 0 130px; min-width:120px; max-width:130px;">
+        <option value="BOTH" selected>Both</option>
+        <option value="LUNCH">Lunch</option>
+        <option value="DINNER">Dinner</option>
+      </select>
+      <div class="location-flags">
+        <label class="flag-pill">
+          <input type="checkbox" name="default_location_lunch" value="${index}">
+          <span>L</span>
+        </label>
+        <label class="flag-pill">
+          <input type="checkbox" name="default_location_dinner" value="${index}">
+          <span>D</span>
+        </label>
+        <label class="flag-pill flag-main">
+          <input type="radio" name="default_location_index" value="${index}">
+          <span>★</span>
+        </label>
+      </div>
       <button type="button" class="btn btn-sm btn-outline-danger remove-location">&times;</button>
     `;
     wrapper.appendChild(div);

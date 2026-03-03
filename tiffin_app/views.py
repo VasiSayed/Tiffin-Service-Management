@@ -260,8 +260,15 @@ def customer_add(request):
         meal_preference = request.POST.get("meal_preference") or "BOTH"
         food_type = request.POST.get("food_type") or "VEG"
 
+        daily_lunch = request.POST.get("daily_lunch") == "on"
+        daily_dinner = request.POST.get("daily_dinner") == "on"
+
         # multiple locations
         raw_locations = [x.strip() for x in request.POST.getlist("locations") if x.strip()]
+        meal_types = request.POST.getlist("location_meal_type")
+        default_lunch_indices = set(request.POST.getlist("default_location_lunch") or [])
+        default_dinner_indices = set(request.POST.getlist("default_location_dinner") or [])
+
         try:
             default_idx = int(request.POST.get("default_location_index", "0"))
         except (TypeError, ValueError):
@@ -279,18 +286,29 @@ def customer_add(request):
             contact_number=request.POST.get("contact_number", ""),
             email=request.POST.get("email") or None,
             delivery_location=default_label,
-            meal_preference=meal_preference,  # ✅ NEW
+            meal_preference=meal_preference,
             food_type=food_type,
-            daily_customer=request.POST.get("daily_customer") == "on",
+            daily_lunch=daily_lunch,
+            daily_dinner=daily_dinner,
+            # daily_customer will be synced in model.save()
             address=request.POST.get("address", ""),
             is_active=request.POST.get("is_active") == "on",
         )
 
-        # create location rows
+        # create location rows with meal mapping + per-meal defaults
         for idx, label in enumerate(raw_locations):
+            mt = "BOTH"
+            if idx < len(meal_types):
+                mt_val = (meal_types[idx] or "").upper()
+                if mt_val in ("LUNCH", "DINNER", "BOTH"):
+                    mt = mt_val
+
             CustomerLocation.objects.create(
                 customer=customer,
                 label=label,
+                meal_type=mt,
+                is_default_lunch=str(idx) in default_lunch_indices,
+                is_default_dinner=str(idx) in default_dinner_indices,
                 is_default=(idx == default_idx),
             )
 
@@ -318,8 +336,16 @@ def customer_edit(request, pk):
         customer.email = request.POST.get("email") or None
         customer.meal_preference = request.POST.get("meal_preference") or "BOTH"
         customer.food_type = request.POST.get("food_type") or "VEG"
+
+        customer.daily_lunch = request.POST.get("daily_lunch") == "on"
+        customer.daily_dinner = request.POST.get("daily_dinner") == "on"
+
         # locations
         raw_locations = [x.strip() for x in request.POST.getlist("locations") if x.strip()]
+        meal_types = request.POST.getlist("location_meal_type")
+        default_lunch_indices = set(request.POST.getlist("default_location_lunch") or [])
+        default_dinner_indices = set(request.POST.getlist("default_location_dinner") or [])
+
         try:
             default_idx = int(request.POST.get("default_location_index", "0"))
         except (TypeError, ValueError):
@@ -332,7 +358,6 @@ def customer_edit(request, pk):
             default_label = raw_locations[default_idx]
 
         customer.delivery_location = default_label
-        customer.daily_customer = request.POST.get("daily_customer") == "on"  # ✅ ADD
         customer.address = request.POST.get("address", "")
         customer.is_active = request.POST.get("is_active") == "on"
         customer.save()
@@ -340,9 +365,18 @@ def customer_edit(request, pk):
         # replace locations for simplicity
         customer.locations.all().delete()
         for idx, label in enumerate(raw_locations):
+            mt = "BOTH"
+            if idx < len(meal_types):
+                mt_val = (meal_types[idx] or "").upper()
+                if mt_val in ("LUNCH", "DINNER", "BOTH"):
+                    mt = mt_val
+
             CustomerLocation.objects.create(
                 customer=customer,
                 label=label,
+                meal_type=mt,
+                is_default_lunch=str(idx) in default_lunch_indices,
+                is_default_dinner=str(idx) in default_dinner_indices,
                 is_default=(idx == default_idx),
             )
 
@@ -2919,22 +2953,34 @@ def daily_entry_register(request):
     # ================== GET: NO PREFILL ==================
     rows = []
     for c in customers:
-        pref = (getattr(c, "meal_preference", "LUNCH") or "LUNCH").upper()
-        if pref not in ("LUNCH", "DINNER"):
-            pref = "LUNCH"
+        pref = (getattr(c, "meal_preference", "BOTH") or "BOTH").upper()
+        if pref not in ("LUNCH", "DINNER", "BOTH"):
+            pref = "BOTH"
 
-        # build locations list (multiple per customer)
+        # build locations list (multiple per customer), filtered by preferred meal when possible
         loc_qs = list(c.locations.all())
         if loc_qs:
-            locs = loc_qs
+            locs = []
+            for loc in loc_qs:
+                mt = (getattr(loc, "meal_type", "BOTH") or "BOTH").upper()
+                if pref == "BOTH" or mt == "BOTH" or mt == pref:
+                    locs.append(loc)
+            if not locs:
+                locs = loc_qs  # fallback if filter removed everything
         else:
             # fallback to legacy single delivery_location
             base_label = (getattr(c, "delivery_location", "") or "").strip()
             locs = [{"id": None, "label": base_label, "is_default": True}] if base_label else []
 
+        # compute which label should be selected by default for this row's meal type
+        try:
+            selected_location = c.get_default_location_for_meal(pref)
+        except Exception:
+            selected_location = (getattr(c, "delivery_location", "") or "").strip()
+
         rows.append({
             "customer": c,
-            "type_label": "Daily" if getattr(c, "daily_customer", False) else "Occasional",
+            "type_label": "Daily" if (getattr(c, "daily_lunch", False) or getattr(c, "daily_dinner", False)) else "Occasional",
             "preferred_meal": pref,
             "exists_any": False,
             "row_meal_type": pref,
@@ -2943,6 +2989,7 @@ def daily_entry_register(request):
             "qty": 1,
             "amount": "0",
             "locations": locs,
+            "selected_location": selected_location,
         })
 
     return render(

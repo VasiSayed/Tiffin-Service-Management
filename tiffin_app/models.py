@@ -79,10 +79,19 @@ class Customer(models.Model):
     name = models.CharField(max_length=200)
     contact_number = models.CharField(max_length=20, blank=True)
     email = models.EmailField(null=True, blank=True)
+
+    # Legacy single location kept for backward compatibility / quick access
     delivery_location = models.CharField(max_length=500)
-    daily_customer = models.BooleanField(default=True)  
+
+    # Legacy overall daily flag (kept for reports / filters)
+    daily_customer = models.BooleanField(default=True)
+
+    # New per-meal daily flags
+    daily_lunch = models.BooleanField(default=True)
+    daily_dinner = models.BooleanField(default=True)
+
     address = models.TextField(blank=True)
-    meal_preference = models.CharField(   # ✅ NEW
+    meal_preference = models.CharField(
         max_length=10,
         choices=MEAL_PREF_CHOICES,
         default="BOTH",
@@ -102,14 +111,71 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.name} - {self.delivery_location}"
 
+    def save(self, *args, **kwargs):
+        """
+        Keep legacy daily_customer in sync with per-meal flags.
+        """
+        try:
+            self.daily_customer = bool(self.daily_lunch or self.daily_dinner)
+        except AttributeError:
+            # If fields not present (early migration stage), fall back to existing value
+            pass
+        super().save(*args, **kwargs)
+
+    def get_default_location_for_meal(self, meal_type: str) -> str:
+        """
+        Best-effort: pick the most appropriate delivery location for a given meal type.
+        Falls back to legacy delivery_location if no specific mapping is found.
+        """
+        mt = (meal_type or "").upper()
+        if mt not in ("LUNCH", "DINNER"):
+            mt = "BOTH"
+
+        locs = list(self.locations.all())
+        if not locs:
+            return (self.delivery_location or "").strip()
+
+        # Prefer per-meal defaults
+        if mt in ("LUNCH", "BOTH"):
+            for loc in locs:
+                if getattr(loc, "is_default_lunch", False):
+                    return (loc.label or "").strip()
+        if mt in ("DINNER", "BOTH"):
+            for loc in locs:
+                if getattr(loc, "is_default_dinner", False):
+                    return (loc.label or "").strip()
+
+        # Then generic default, if any
+        for loc in locs:
+            if getattr(loc, "is_default", False):
+                return (loc.label or "").strip()
+
+        # Finally, first location or legacy field
+        return (locs[0].label or "").strip() if locs else (self.delivery_location or "").strip()
+
 
 class CustomerLocation(models.Model):
+    MEAL_TYPE_CHOICES = [
+        ("LUNCH", "Lunch"),
+        ("DINNER", "Dinner"),
+        ("BOTH", "Both"),
+    ]
+
     customer = models.ForeignKey(
         Customer,
         on_delete=models.CASCADE,
         related_name="locations",
     )
     label = models.CharField(max_length=255)
+
+    # Which meal(s) this location is used for
+    meal_type = models.CharField(max_length=10, choices=MEAL_TYPE_CHOICES, default="BOTH")
+
+    # Per-meal defaults
+    is_default_lunch = models.BooleanField(default=False)
+    is_default_dinner = models.BooleanField(default=False)
+
+    # Legacy generic default kept for backward compatibility
     is_default = models.BooleanField(default=False)
 
     class Meta:
