@@ -122,6 +122,7 @@ from .models import (
     Payment,
     ExpenseCategory,
     ExpenseItem,
+    DailyExpense,
 )
 from .forms_expenses import ExpenseCategoryForm, ExpenseItemForm
 
@@ -216,11 +217,23 @@ def dashboard(request):
     tenant = _tenant(request)
     today = date.today()
 
+    today_orders_qs = DailyEntry.objects.filter(tenant=tenant, entry_date=today)
+    today_orders_count = today_orders_qs.count()
+    today_pending_amount = today_orders_qs.aggregate(s=Sum("total_amount"))["s"] or 0
+    today_customers_count = today_orders_qs.values("customer").distinct().count()
+
+    today_expenses_total = (
+        DailyExpense.objects.filter(tenant=tenant, date=today).aggregate(s=Sum("total"))["s"] or 0
+    )
+
     context = {
         "total_customers": Customer.objects.filter(tenant=tenant, is_active=True).count(),
         "total_dishes": Dish.objects.filter(tenant=tenant, is_active=True).count(),
         "total_meals": Meal.objects.filter(tenant=tenant, is_active=True).count(),
-        "today_orders": DailyEntry.objects.filter(tenant=tenant, entry_date=today).count(),
+        "today_orders": today_orders_count,
+        "today_pending_amount": today_pending_amount,
+        "today_expenses_total": today_expenses_total,
+        "today_customers_count": today_customers_count,
     }
     return render(request, "tiffin_app/dashboard.html", context)
 

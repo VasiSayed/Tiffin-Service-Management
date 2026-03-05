@@ -1,44 +1,350 @@
 {% extends 'tiffin_app/base.html' %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Dashboard — {{ tenant_name }}{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
 {% block top_actions %}
-<a href="{% url 'daily_entry_add' %}" class="btn btn-primary btn-lg">+ Create Order</a>
+<a href="{% url 'daily_entry_add' %}" class="btn btn-primary btn-lg">+ New Order</a>
 {% endblock %}
 
 {% block content %}
 <div class="main-content">
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-label">Total Customers</div>
-            <div class="stat-value">{{ total_customers }}</div>
+
+    {# ── Greeting banner — bg uses {{ theme_primary }} via CSS var ── #}
+    <div class="dash-greeting">
+        <div class="dash-greeting-left">
+            <div class="dash-greeting-hi">👋 Welcome back,</div>
+            <div class="dash-greeting-name">{{ user.username }}</div>
+            <div class="dash-greeting-sub">
+                Here's what's happening with <strong>{{ tenant_name }}</strong> today.
+            </div>
         </div>
-        <div class="stat-card success">
-            <div class="stat-label">Total Dishes</div>
-            <div class="stat-value">{{ total_dishes }}</div>
-        </div>
-        <div class="stat-card warning">
-            <div class="stat-label">Total Meals</div>
-            <div class="stat-value">{{ total_meals }}</div>
-        </div>
-        <div class="stat-card danger">
-            <div class="stat-label">Today's Orders</div>
-            <div class="stat-value">{{ today_orders }}</div>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">Quick Actions</h2>
-        </div>
-        <div class="card-body">
-            <div class="flex gap-2">
-                <a href="{% url 'daily_entry_add' %}" class="btn btn-primary btn-lg">+ Create Order</a>
-                <a href="{% url 'print_stickers' %}" class="btn btn-secondary">Print Stickers</a>
-                <a href="{% url 'customer_add' %}" class="btn btn-secondary">+ Add Customer</a>
+        <div class="dash-greeting-right">
+            <div class="dash-date-box">
+                <div class="dash-date-num" id="js-date-day"></div>
+                <div class="dash-date-str" id="js-date-str"></div>
             </div>
         </div>
     </div>
+
+    {# ── Stats grid (always show all widgets; 0 when no data) ── #}
+    <div class="stats-grid">
+
+        <div class="stat-card">
+            <div class="stat-band"></div>
+            <div class="stat-card-inner">
+                <div class="stat-icon">👤</div>
+                <div class="stat-label">Total Customers</div>
+                <div class="stat-value counter" data-target="{{ total_customers|default:0 }}">{{ total_customers|default:0 }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card success">
+            <div class="stat-band"></div>
+            <div class="stat-card-inner">
+                <div class="stat-icon">🍛</div>
+                <div class="stat-label">Total Dishes</div>
+                <div class="stat-value counter" data-target="{{ total_dishes|default:0 }}">{{ total_dishes|default:0 }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card warning">
+            <div class="stat-band"></div>
+            <div class="stat-card-inner">
+                <div class="stat-icon">🍱</div>
+                <div class="stat-label">Total Meals</div>
+                <div class="stat-value counter" data-target="{{ total_meals|default:0 }}">{{ total_meals|default:0 }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card danger">
+            <div class="stat-band"></div>
+            <div class="stat-card-inner">
+                <div class="stat-icon">📋</div>
+                <div class="stat-label">Today's Orders</div>
+                <div class="stat-value counter" data-target="{{ today_orders|default:0 }}">{{ today_orders|default:0 }}</div>
+            </div>
+        </div>
+
+    </div>
+
+    {# ── Dashboard body grid ── #}
+    <div class="dash-body">
+
+        {# Quick Actions ─ tile bg uses primary-10/primary-20 from CSS #}
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Quick Actions</h2>
+                <span class="badge badge-primary">Shortcuts</span>
+            </div>
+            <div class="card-body">
+                <div class="qa-grid">
+
+                    <a href="{% url 'daily_entry_add' %}" class="qa-tile">
+                        <div class="qa-icon-box">📝</div>
+                        <div>
+                            <div class="qa-label">Create Order</div>
+                            <div class="qa-hint">New daily entry</div>
+                        </div>
+                    </a>
+
+                    <a href="{% url 'print_stickers' %}" class="qa-tile">
+                        <div class="qa-icon-box">🏷</div>
+                        <div>
+                            <div class="qa-label">Print Stickers</div>
+                            <div class="qa-hint">Label generator</div>
+                        </div>
+                    </a>
+
+                    <a href="{% url 'customer_add' %}" class="qa-tile">
+                        <div class="qa-icon-box">👤</div>
+                        <div>
+                            <div class="qa-label">Add Customer</div>
+                            <div class="qa-hint">Register client</div>
+                        </div>
+                    </a>
+
+                    <a href="{% url 'expense_dashboard' %}" class="qa-tile">
+                        <div class="qa-icon-box">₹</div>
+                        <div>
+                            <div class="qa-label">Log Expense</div>
+                            <div class="qa-hint">Track spending</div>
+                        </div>
+                    </a>
+
+                    <a href="{% url 'daily_menu_list' %}" class="qa-tile">
+                        <div class="qa-icon-box">🗓</div>
+                        <div>
+                            <div class="qa-label">Daily Menu</div>
+                            <div class="qa-hint">Today's items</div>
+                        </div>
+                    </a>
+
+                    <a href="{% url 'reports' %}" class="qa-tile">
+                        <div class="qa-icon-box">📈</div>
+                        <div>
+                            <div class="qa-label">View Reports</div>
+                            <div class="qa-hint">Analytics</div>
+                        </div>
+                    </a>
+
+                </div>
+            </div>
+        </div>
+
+        {# Today’s snapshot — 4 widgets in one box #}
+        <div class="card dash-today-box">
+            <div class="card-header">
+                <h2 class="card-title">Today</h2>
+            </div>
+            <div class="card-body dash-today-widgets">
+                <div class="dash-today-widget">
+                    <div class="dash-today-widget-icon">📋</div>
+                    <div class="dash-today-widget-label">Today's Orders</div>
+                    <div class="dash-today-widget-value">{{ today_orders|default:0 }}</div>
+                </div>
+                <div class="dash-today-widget">
+                    <div class="dash-today-widget-icon">📊</div>
+                    <div class="dash-today-widget-label">Expenses Today</div>
+                    <div class="dash-today-widget-value">₹{{ today_expenses_total|default:0|floatformat:0 }}</div>
+                </div>
+                <div class="dash-today-widget">
+                    <div class="dash-today-widget-icon">₹</div>
+                    <div class="dash-today-widget-label">Today Pending Amount</div>
+                    <div class="dash-today-widget-value">₹{{ today_pending_amount|default:0|floatformat:0 }}</div>
+                </div>
+                <div class="dash-today-widget">
+                    <div class="dash-today-widget-icon">👤</div>
+                    <div class="dash-today-widget-label">Customers (ordered today)</div>
+                    <div class="dash-today-widget-value">{{ today_customers_count|default:0 }}</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
 </div>
+
+{# ── Dashboard-specific styles (all colors reference CSS vars set from Django) ── #}
+<style>
+
+/* Greeting banner — gradient uses --primary (= {{ theme_primary }}) */
+.dash-greeting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border-radius: var(--r-xl);
+    padding: 22px 28px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-p);
+}
+
+/* Decorative circles */
+.dash-greeting::before,
+.dash-greeting::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.07);
+}
+.dash-greeting::before { width: 200px; height: 200px; top: -80px; right: 60px; }
+.dash-greeting::after  { width: 100px;  height: 100px;  bottom: -40px; right: 20px; }
+
+.dash-greeting-left { position: relative; z-index: 1; }
+.dash-greeting-hi   { font-size: .8rem; color: rgba(255,255,255,.75); margin-bottom: 3px; }
+.dash-greeting-name {
+    font-family: 'Fraunces', serif;
+    font-size: 1.55rem; font-weight: 700;
+    color: #fff; letter-spacing: -.02em;
+    text-transform: capitalize;
+}
+.dash-greeting-sub { font-size: .8rem; color: rgba(255,255,255,.65); margin-top: 4px; }
+.dash-greeting-sub strong { color: rgba(255,255,255,.9); }
+
+.dash-greeting-right { position: relative; z-index: 1; }
+.dash-date-box {
+    background: rgba(255,255,255,.15);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: var(--r-lg);
+    padding: 12px 18px;
+    text-align: center; color: #fff;
+    min-width: 80px;
+}
+.dash-date-num { font-family: 'Fraunces', serif; font-size: 1.8rem; font-weight: 700; line-height: 1; }
+.dash-date-str { font-size: .72rem; opacity: .8; margin-top: 2px; }
+
+/* Today box — 4 widgets in one card */
+.dash-today-box .card-body { padding: 16px 20px; }
+.dash-today-widgets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+.dash-today-widget {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.dash-today-widget-icon {
+    font-size: 1.1rem;
+    margin-bottom: 2px;
+}
+.dash-today-widget-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+}
+.dash-today-widget-value {
+    font-family: 'Fraunces', serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+    .dash-today-widgets { grid-template-columns: 1fr; }
+}
+
+/* Dashboard body layout */
+.dash-body {
+    display: grid;
+    grid-template-columns: 1fr 310px;
+    gap: 20px;
+}
+
+@media (max-width: 960px) { .dash-body { grid-template-columns: 1fr; } }
+
+/* Quick actions grid */
+.qa-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 640px) { .qa-grid { grid-template-columns: repeat(2,1fr); } }
+
+/* Tile — background/border use primary CSS vars */
+.qa-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 18px;
+    border-radius: var(--r-lg);
+    border: 1.5px solid var(--primary-20);
+    background: var(--primary-10);
+    text-decoration: none;
+    transition: all var(--dur) var(--ease);
+    cursor: pointer;
+}
+
+.qa-tile:hover {
+    background: var(--primary);           /* solid primary on hover */
+    border-color: var(--primary);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-p);
+}
+
+/* Icon box — primary bg */
+.qa-icon-box {
+    width: 40px; height: 40px;
+    border-radius: var(--r-md);
+    background: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem;
+    transition: background var(--dur);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.qa-tile:hover .qa-icon-box { background: rgba(255,255,255,.22); box-shadow: none; }
+
+.qa-label {
+    font-size: .825rem; font-weight: 700;
+    color: var(--primary-dark);
+    transition: color var(--dur);
+}
+.qa-hint {
+    font-size: .7rem; color: var(--text-3);
+    transition: color var(--dur);
+}
+.qa-tile:hover .qa-label,
+.qa-tile:hover .qa-hint { color: rgba(255,255,255,.9); }
+
+</style>
+
+<script>
+/* Live date */
+(function() {
+    const d = new Date();
+    const dayEl = document.getElementById('js-date-day');
+    const strEl = document.getElementById('js-date-str');
+    if (dayEl) dayEl.textContent = d.getDate();
+    if (strEl) strEl.textContent = d.toLocaleDateString('en-IN', { weekday:'short', month:'short', year:'numeric' });
+})();
+
+/* Count-up animation */
+document.querySelectorAll('.counter').forEach(el => {
+    const target = parseInt(el.dataset.target) || 0;
+    if (!target) { el.textContent = '0'; return; }
+    let current = 0;
+    const step = Math.max(1, Math.floor(target / 45));
+    const timer = setInterval(() => {
+        current = Math.min(current + step, target);
+        el.textContent = current;
+        if (current >= target) clearInterval(timer);
+    }, 28);
+});
+</script>
+
 {% endblock %}

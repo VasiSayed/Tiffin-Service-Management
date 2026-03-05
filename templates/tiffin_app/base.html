@@ -5,654 +5,1266 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Tiffin Service Management{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Fraunces:wght@300;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'tiffin_app/css/style.css' %}">
+
     <style>
+        /* ═══════════════════════════════════════════
+           ALL COLORS COME FROM DJANGO TEMPLATE VARS
+           {{ theme_primary }}, {{ theme_secondary }},
+           {{ lunch_sticker_color }}, {{ dinner_sticker_color }}
+        ═══════════════════════════════════════════ */
         :root {
-            --primary: {{ theme_primary }};
-            --primary-dark: {{ theme_primary }}dd;
-            --primary-light: {{ theme_primary }}33;
-            --secondary: {{ theme_secondary }};
-            --accent: {{ theme_secondary }};
-            --lunch-sticker: {{ lunch_sticker_color }};
-            --dinner-sticker: {{ dinner_sticker_color }};
+            /* ── Your existing dynamic vars (unchanged) ── */
+            --primary:          {{ theme_primary }};
+            --secondary:        {{ theme_secondary }};
+            --accent:           {{ theme_secondary }};
+            --lunch-sticker:    {{ lunch_sticker_color }};
+            --dinner-sticker:   {{ dinner_sticker_color }};
+
+            /* ── Derived from --primary via CSS (no extra Django vars needed) ── */
+            --primary-10:       color-mix(in srgb, {{ theme_primary }} 10%, white);
+            --primary-15:       color-mix(in srgb, {{ theme_primary }} 15%, white);
+            --primary-20:       color-mix(in srgb, {{ theme_primary }} 20%, white);
+            --primary-dark:     color-mix(in srgb, {{ theme_primary }} 85%, black);
+
+            /* ── Neutral surfaces ── */
+            --bg:               #f7f5f2;
+            --bg-card:          #ffffff;
+            --bg-sidebar:       #1c1917;
+            --surface-2:        #f0ede8;
+
+            /* ── Text ── */
+            --text-1:           #1a1512;
+            --text-2:           #5c524a;
+            --text-3:           #9c8e84;
+            --text-on-primary:  #ffffff;
+
+            /* ── Borders ── */
+            --border:           rgba(0,0,0,0.08);
+            --border-med:       rgba(0,0,0,0.13);
+
+            /* ── Semantic ── */
+            --green:   #16a34a; --green-bg:  #dcfce7;
+            --amber:   #d97706; --amber-bg:  #fef3c7;
+            --red:     #dc2626; --red-bg:    #fee2e2;
+            --blue:    #2563eb; --blue-bg:   #dbeafe;
+
+            /* ── Layout ── */
+            --sidebar-w:    260px;
+            --sidebar-coll: 68px;
+            --topbar-h:     62px;
+
+            /* ── Shape ── */
+            --r-sm:   8px;
+            --r-md:   12px;
+            --r-lg:   18px;
+            --r-xl:   24px;
+            --r-full: 999px;
+
+            /* ── Shadow ── */
+            --shadow-xs: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
+            --shadow-md: 0 4px 20px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.07);
+            --shadow-p:  0 4px 18px color-mix(in srgb, {{ theme_primary }} 45%, transparent);
+
+            /* ── Motion ── */
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
+            --dur:  220ms;
+
+            /* ── Compatibility (login & child templates) ── */
+            --primary-light: color-mix(in srgb, {{ theme_primary }} 12%, white);
         }
+
+        /* ══════ RESET ══════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: 16px; }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text-1);
+            min-height: 100vh;
+            display: flex;
+            overflow-x: hidden;
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+        }
+        a { text-decoration: none; color: inherit; }
+
+        /* ══════ SIDEBAR ══════ */
+        .sidebar {
+            width: var(--sidebar-w);
+            height: 100vh;
+            position: fixed;
+            left: 0; top: 0;
+            background: var(--bg-sidebar);
+            display: flex;
+            flex-direction: column;
+            z-index: 200;
+            transition: width var(--dur) var(--ease);
+            overflow: hidden;
+        }
+
+        /* Top color stripe — uses {{ theme_primary }} */
+        .sidebar-stripe {
+            height: 4px;
+            background: linear-gradient(90deg,
+                {{ theme_primary }},
+                color-mix(in srgb, {{ theme_primary }} 60%, white),
+                {{ theme_primary }}
+            );
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 18px 14px 16px 16px;
+            padding-right: 40px; /* space so toggle doesn’t cover brand name */
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            overflow: visible;
+            min-height: 60px;
+        }
+
+        .sidebar-brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+
+        /* Logo box — primary color background */
+        .brand-logo-box {
+            width: 38px; height: 38px;
+            border-radius: var(--r-md);
+            background: {{ theme_primary }};
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+            box-shadow: var(--shadow-p);
+        }
+
+        .sidebar-logo-img {
+            width: 38px; height: 38px;
+            border-radius: var(--r-md);
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .brand-name {
+            font-family: 'Fraunces', serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.01em;
+            white-space: normal;
+            line-height: 1.25;
+            word-break: break-word;
+            max-width: 100%;
+        }
+
+        .brand-sub {
+            font-size: 0.62rem;
+            color: rgba(255,255,255,0.35);
+            margin-top: 2px;
+            white-space: nowrap;
+        }
+
+        /* Nav */
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .sidebar-nav::-webkit-scrollbar { width: 2px; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+        .nav-section {
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: rgba(255,255,255,0.28);
+            padding: 14px 12px 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            transition: opacity var(--dur);
+        }
+
+        .nav-item { margin-bottom: 2px; }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 9px 12px;
+            border-radius: var(--r-md);
+            color: rgba(255,255,255,0.52);
+            font-size: 0.875rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            transition: all var(--dur) var(--ease);
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: rgba(255,255,255,0.88);
+            background: rgba(255,255,255,0.07);
+        }
+
+        /* Active — solid primary color */
+        .nav-link.active {
+            background: {{ theme_primary }};
+            color: #fff;
+            font-weight: 600;
+            box-shadow: var(--shadow-p);
+        }
+
+        .nav-icon {
+            width: 20px; height: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .nav-text { overflow: hidden; transition: opacity var(--dur); }
+
+        /* Footer */
+        .sidebar-footer {
+            padding: 12px;
+            border-top: 1px solid rgba(255,255,255,0.07);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        /* User card — blends with dark sidebar (no bright block) */
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: var(--r-md);
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.06);
+            white-space: nowrap;
+            overflow: hidden;
+            transition: background var(--dur);
+        }
+        .sidebar-user:hover { background: rgba(0,0,0,0.35); }
+
+        /* Avatar — subtle so card doesn’t look like a bright blue block */
+        .user-avatar-sidebar {
+            width: 32px; height: 32px;
+            border-radius: var(--r-full);
+            background: rgba(255,255,255,0.14);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.95);
+            flex-shrink: 0;
+            letter-spacing: 0;
+        }
+
+        .user-info-sidebar {
+            overflow: hidden;
+            transition: opacity var(--dur), width var(--dur);
+            min-width: 0;
+        }
+        .user-name-sidebar {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .user-role-sidebar {
+            font-size: 0.67rem;
+            color: rgba(255,255,255,0.4);
+            white-space: nowrap;
+            margin-top: 1px;
+        }
+
+        /* ── Sidebar collapsed: hide text labels ── */
+        .sidebar.collapsed { width: var(--sidebar-coll); }
+        .sidebar.collapsed .brand-name,
+        .sidebar.collapsed .brand-sub,
+        .sidebar.collapsed .nav-section,
+        .sidebar.collapsed .nav-text,
+        .sidebar.collapsed .user-info-sidebar { opacity: 0; pointer-events: none; width: 0; overflow: hidden; }
+
+        /* Collapsed footer: center avatar, hide signout button */
+        .sidebar.collapsed .sidebar-user {
+            justify-content: center;
+            padding: 10px 8px;
+        }
+        .sidebar.collapsed .btn-logout-sidebar {
+            display: none;
+        }
+
+        /* ══════ TOGGLE BUTTON ══════ */
+        .sidebar-toggle {
+            position: fixed;
+            left: calc(var(--sidebar-w) - 13px);
+            top: calc(var(--topbar-h) / 2);
+            transform: translateY(-50%);
+            width: 26px; height: 26px;
+            border-radius: var(--r-full);
+            background: {{ theme_primary }};
+            border: 2px solid var(--bg);
+            color: #fff;
+            cursor: pointer;
+            z-index: 300;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.6rem;
+            transition: left var(--dur) var(--ease), box-shadow var(--dur);
+            box-shadow: var(--shadow-p);
+        }
+
+        .sidebar-toggle:hover {
+            box-shadow: 0 4px 22px color-mix(in srgb, {{ theme_primary }} 60%, transparent);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .main-wrapper.sidebar-collapsed ~ .sidebar-toggle,
+        body.sidebar-collapsed .sidebar-toggle {
+            left: calc(var(--sidebar-coll) - 13px);
+        }
+
+        /* ══════ OVERLAY (mobile) ══════ */
+        .sidebar-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(3px);
+            z-index: 199;
+        }
+        .sidebar-overlay.show { display: block; }
+
+        /* ══════ MOBILE MENU BTN ══════ */
+        .mobile-menu-btn {
+            display: none;
+            position: fixed;
+            bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: {{ theme_primary }};
+            color: #fff;
+            border: none;
+            border-radius: var(--r-full);
+            padding: 11px 24px;
+            font-size: 1rem;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 998;
+            box-shadow: var(--shadow-p);
+        }
+
+        /* ══════ MAIN WRAPPER ══════ */
+        .main-wrapper {
+            margin-left: var(--sidebar-w);
+            flex: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: margin-left var(--dur) var(--ease);
+        }
+
+        .main-wrapper.sidebar-collapsed { margin-left: var(--sidebar-coll); }
+
+        /* ══════ TOP BAR ══════ */
+        .top-bar {
+            min-height: var(--topbar-h);
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 28px 12px 24px;
+            position: sticky; top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-xs);
+        }
+
+        .top-bar-title {
+            font-family: 'Fraunces', serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            /* Title text uses primary color gradient */
+            background: linear-gradient(135deg, {{ theme_primary }}, color-mix(in srgb, {{ theme_primary }} 70%, #f5a623));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: 20px;
+            padding: 6px 0;
+            flex-shrink: 0;
+        }
+        .top-bar-actions .btn { margin: 0; }
+
+        /* ══════ PAGE CONTENT ══════ */
+        .page-content,
+        .main-content {
+            flex: 1;
+            padding: 28px;
+            animation: fadeUp 280ms var(--ease) both;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ══════ BUTTONS ══════ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 20px;
+            border-radius: var(--r-md);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all var(--dur) var(--ease);
+            white-space: nowrap;
+            letter-spacing: -0.01em;
+        }
+
+        /* Primary button — {{ theme_primary }} */
+        .btn-primary {
+            background: {{ theme_primary }};
+            color: #fff;
+            border-color: {{ theme_primary }};
+            box-shadow: var(--shadow-p);
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            box-shadow: 0 6px 24px color-mix(in srgb, {{ theme_primary }} 50%, transparent);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-2);
+            border-color: var(--border-med);
+            box-shadow: var(--shadow-xs);
+        }
+        .btn-secondary:hover { background: var(--surface-2); color: var(--text-1); }
+
+        /* Outline uses primary color */
+        .btn-outline {
+            background: var(--primary-10);
+            color: var(--primary-dark);
+            border-color: var(--primary-20);
+        }
+        .btn-outline:hover { background: var(--primary-20); }
+
+        .btn-ghost { background: transparent; color: var(--text-2); border-color: transparent; }
+        .btn-ghost:hover { background: var(--surface-2); color: var(--text-1); }
+
+        .btn-lg { padding: 11px 26px; font-size: 0.925rem; }
+        .btn-sm { padding: 6px 14px; font-size: 0.78rem; }
+        .w-full { width: 100%; justify-content: center; }
+
+        /* Logout button */
+        /* Signout — small icon-only button, pushed to right inside user row */
+        .btn-logout-sidebar {
+            margin-left: auto;
+            flex-shrink: 0;
+            width: 28px; height: 28px;
+            border-radius: var(--r-full);
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.45);
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all var(--dur) var(--ease);
+            padding: 0;
+        }
+        .btn-logout-sidebar:hover {
+            background: rgba(220,38,38,0.18);
+            border-color: rgba(220,38,38,0.4);
+            color: #fca5a5;
+            transform: scale(1.08);
+        }
+        /* Hide text label — icon only */
+        .btn-logout-sidebar .logout-text { display: none; }
+
+        /* ══════ CARDS ══════ */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-xs);
+            transition: box-shadow var(--dur);
+        }
+        .card:hover { box-shadow: var(--shadow-md); }
+
+        .card-header {
+            padding: 18px 22px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .card-title {
+            font-family: 'Fraunces', serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-1);
+            letter-spacing: -0.02em;
+        }
+
+        .card-body { padding: 22px; }
+
+        /* ══════ STAT CARDS ══════ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-xs);
+            transition: all var(--dur) var(--ease);
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+        /* Default stat card — primary color top band */
+        .stat-card .stat-band {
+            height: 4px;
+            background: {{ theme_primary }};
+        }
+        .stat-card.success .stat-band { background: var(--green); }
+        .stat-card.warning .stat-band { background: var(--amber); }
+        .stat-card.danger  .stat-band { background: var(--red); }
+
+        .stat-card-inner { padding: 18px 20px 20px; }
+
+        .stat-icon {
+            width: 42px; height: 42px;
+            border-radius: var(--r-md);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem;
+            margin-bottom: 14px;
+        }
+        /* Default icon bg — primary tint */
+        .stat-card .stat-icon         { background: var(--primary-10); }
+        .stat-card.success .stat-icon { background: var(--green-bg); }
+        .stat-card.warning .stat-icon { background: var(--amber-bg); }
+        .stat-card.danger  .stat-icon { background: var(--red-bg); }
+
+        .stat-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-3);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-family: 'Fraunces', serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            color: var(--text-1);
+        }
+        /* Default stat value — primary color */
+        .stat-card .stat-value         { color: {{ theme_primary }}; }
+        .stat-card.success .stat-value { color: var(--green); }
+        .stat-card.warning .stat-value { color: var(--amber); }
+        .stat-card.danger  .stat-value { color: var(--red); }
+
+        /* ══════ MESSAGES ══════ */
+        .messages-wrap { padding: 0 28px; }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: var(--r-md);
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .alert-success { background: var(--green-bg);  border: 1px solid rgba(22,163,74,.25);  color: var(--green); }
+        .alert-error   { background: var(--red-bg);    border: 1px solid rgba(220,38,38,.25);  color: var(--red); }
+        .alert-warning { background: var(--amber-bg);  border: 1px solid rgba(217,119,6,.25);  color: var(--amber); }
+        /* Info alert — primary tint */
+        .alert-info    { background: var(--primary-10); border: 1px solid var(--primary-20); color: var(--primary-dark); }
+
+        /* ══════ TABLES ══════ */
+        .table-wrap { overflow-x: auto; border-radius: var(--r-lg); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        thead tr { border-bottom: 1px solid var(--border); }
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-3);
+            white-space: nowrap;
+        }
+        td { padding: 14px 16px; border-bottom: 1px solid var(--border); color: var(--text-2); }
+        tbody tr:hover { background: var(--primary-10); }
+        tbody tr:hover td { color: var(--text-1); }
+        tbody tr:last-child td { border-bottom: none; }
+
+        /* ══════ FORMS ══════ */
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-3);
+            margin-bottom: 7px;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        input[type="password"],
+        input[type="date"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--surface-2);
+            border: 1.5px solid var(--border-med);
+            border-radius: var(--r-md);
+            color: var(--text-1);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.875rem;
+            outline: none;
+            transition: all var(--dur) var(--ease);
+            appearance: none;
+        }
+        /* Input focus — primary border */
+        input:focus, select:focus, textarea:focus {
+            border-color: {{ theme_primary }};
+            box-shadow: 0 0 0 3px var(--primary-15);
+        }
+
+        /* ══════ BADGES ══════ */
+        .badge {
+            display: inline-flex; align-items: center;
+            padding: 3px 10px;
+            border-radius: var(--r-full);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        /* Primary badge — theme color */
+        .badge-primary { background: var(--primary-10); color: var(--primary-dark); border: 1px solid var(--primary-20); }
+        .badge-success { background: var(--green-bg);   color: var(--green);  }
+        .badge-warning { background: var(--amber-bg);   color: var(--amber);  }
+        .badge-danger  { background: var(--red-bg);     color: var(--red);    }
+
+        /* ══════ TOGGLE SWITCH ══════ */
+        .toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+        .toggle input { display: none; }
+        .toggle .track {
+            width: 44px; height: 24px;
+            background: var(--border-med);
+            border-radius: var(--r-full);
+            position: relative;
+            transition: background 0.2s;
+        }
+        .toggle .thumb {
+            width: 18px; height: 18px;
+            background: #fff;
+            border-radius: var(--r-full);
+            position: absolute;
+            top: 3px; left: 3px;
+            transition: left 0.2s;
+            box-shadow: 0 1px 4px rgba(0,0,0,.18);
+        }
+        /* Checked — primary color */
+        .toggle input:checked + .track { background: {{ theme_primary }}; }
+        .toggle input:checked + .track .thumb { left: 23px; }
+
+        /* ══════ DIVIDER ══════ */
+        .divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+        /* ══════ FLEX UTILS ══════ */
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 8px; }
+        .gap-3 { gap: 12px; }
+        .gap-4 { gap: 16px; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .text-right { text-align: right; }
+        .mt-2 { margin-top: 8px; }
+        .mt-3 { margin-top: 16px; }
+        .text-center { text-align: center; }
+        .text-muted { color: var(--text-3); }
+
+        /* ══════ COMPATIBILITY (child templates) ══════ */
+        .form-label { display: block; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 7px; }
+        .form-control { width: 100%; padding: 10px 14px; background: var(--surface-2); border: 1.5px solid var(--border-med); border-radius: var(--r-md); color: var(--text-1); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.875rem; outline: none; transition: all var(--dur) var(--ease); appearance: none; }
+        .form-control:focus { border-color: {{ theme_primary }}; box-shadow: 0 0 0 3px var(--primary-15); }
+        .form-control-lg { padding: 12px 16px; font-size: 0.95rem; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 16px; }
+        .form-row .form-group { flex: 1; min-width: 0; }
+        .search-box { min-width: 0; }
+
+        .badge-info { background: var(--primary-10); color: var(--primary-dark); border: 1px solid var(--primary-20); }
+        .btn-outline-primary { background: var(--primary-10); color: var(--primary-dark); border-color: var(--primary-20); }
+        .btn-outline-primary:hover { background: var(--primary-20); }
+        .btn-success { background: var(--green); color: #fff; border-color: var(--green); }
+        .btn-success:hover { background: #15803d; transform: translateY(-1px); }
+        .btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
+        .btn-danger:hover { background: #b91c1c; transform: translateY(-1px); }
+        .btn-accent { background: var(--secondary); color: #fff; border-color: var(--secondary); }
+        .btn-accent:hover { background: color-mix(in srgb, var(--secondary) 85%, black); transform: translateY(-1px); }
+
+        .table-container { overflow-x: auto; border-radius: var(--r-lg); }
+        .table-responsive { overflow-x: auto; }
+        table.table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        .table-sm th, .table-sm td { padding: 8px 12px; font-size: 0.8rem; }
+        .table-bordered { border: 1px solid var(--border); }
+        .table-bordered th, .table-bordered td { border: 1px solid var(--border); }
+        .table-actions { white-space: nowrap; }
+        .table-actions .btn { margin-right: 4px; }
+        .action-buttons { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .card-body-compact { padding: 12px 22px; }
+
+        .empty-state { text-align: center; padding: 32px 24px; color: var(--text-3); }
+        .empty-state-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.7; }
+        .empty-state-text { font-size: 1rem; font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
+        .empty-state-hint { font-size: 0.85rem; color: var(--text-3); }
+
+        /* Filter toggle group (e.g. Daily Menu LUNCH/DINNER/BOTH) */
+        .toggle-group { display: flex; flex-wrap: wrap; gap: 8px; }
+        .toggle-group .toggle-btn { padding: 8px 16px; border-radius: var(--r-md); font-size: 0.85rem; font-weight: 600; border: 1.5px solid var(--border-med); background: var(--surface-2); color: var(--text-2); cursor: pointer; transition: all var(--dur) var(--ease); font-family: 'Plus Jakarta Sans', sans-serif; }
+        .toggle-group .toggle-btn:hover { background: var(--primary-10); color: var(--primary-dark); border-color: var(--primary-20); }
+        .toggle-group .toggle-btn.active { background: {{ theme_primary }}; color: #fff; border-color: {{ theme_primary }}; }
+
+        /* ══════ PRINT ══════ */
+        @media print {
+            .no-print, .sidebar, .sidebar-toggle,
+            .mobile-menu-btn, .chatbot-widget { display: none !important; }
+            .main-wrapper { margin-left: 0 !important; }
+        }
+
+        /* ══════ RESPONSIVE ══════ */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: var(--sidebar-w) !important;
+                transition: transform var(--dur) var(--ease);
+            }
+            .sidebar.mobile-open { transform: translateX(0); }
+            .main-wrapper { margin-left: 0 !important; }
+            .sidebar-toggle { display: none; }
+            .mobile-menu-btn { display: block; }
+            .page-content, .main-content { padding: 20px 16px 80px; }
+            .top-bar { padding: 0 18px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        }
+
+        /* ══════ CHATBOT ══════ */
+        .chatbot-widget {
+            position: fixed;
+            bottom: 22px; right: 22px;
+            z-index: 9999;
+        }
+
+        /* FAB — primary color */
+        .chatbot-toggle {
+            width: 56px; height: 56px;
+            border-radius: var(--r-full);
+            background: {{ theme_primary }};
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 2px;
+            box-shadow: var(--shadow-p), 0 4px 12px rgba(0,0,0,.15);
+            transition: all var(--dur) var(--ease);
+        }
+        .chatbot-toggle:hover {
+            background: var(--primary-dark);
+            transform: scale(1.08);
+            box-shadow: 0 6px 28px color-mix(in srgb, {{ theme_primary }} 60%, transparent);
+        }
+        .chat-icon { font-size: 1.3rem; }
+        .chat-text { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; }
+
+        .chatbot-window {
+            position: absolute;
+            bottom: 72px; right: 0;
+            width: 355px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-med);
+            /* Window top border — primary color */
+            border-top: 3px solid {{ theme_primary }};
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow-lg);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            animation: popIn 260ms var(--ease) both;
+        }
+
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* Chat header — primary */
+        .chatbot-header {
+            padding: 14px 18px;
+            background: {{ theme_primary }};
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .chatbot-header h3 { margin: 0; font-size: 0.95rem; font-weight: 700; color: #fff; }
+        .chat-close {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: none; color: #fff; font-size: 1rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background var(--dur);
+        }
+        .chat-close:hover { background: rgba(255,255,255,0.35); }
+
+        .chatbot-body {
+            flex: 1; min-height: 260px; max-height: 320px;
+            overflow-y: auto;
+            padding: 16px;
+            background: var(--surface-2);
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .chatbot-body::-webkit-scrollbar { width: 3px; }
+        .chatbot-body::-webkit-scrollbar-thumb { background: var(--border-med); border-radius: 3px; }
+
+        .chat-message { display: flex; }
+        .chat-message.bot  { justify-content: flex-start; }
+        .chat-message.user { justify-content: flex-end; }
+
+        .message-bubble {
+            max-width: 78%; padding: 10px 14px;
+            border-radius: 14px; font-size: 0.85rem; line-height: 1.5;
+        }
+        .chat-message.bot  .message-bubble {
+            background: #fff; color: var(--text-2);
+            border: 1px solid var(--border); border-bottom-left-radius: 4px;
+            box-shadow: var(--shadow-xs);
+        }
+        /* User bubble — primary */
+        .chat-message.user .message-bubble {
+            background: {{ theme_primary }};
+            color: #fff; border-bottom-right-radius: 4px;
+        }
+
+        .chatbot-footer {
+            border-top: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            padding: 10px 12px 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Quick action buttons — primary outlined */
+        .quick-btn {
+            padding: 8px 10px;
+            border: 1.5px solid color-mix(in srgb, {{ theme_primary }} 30%, white);
+            background: var(--primary-10);
+            border-radius: var(--r-md);
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            transition: all var(--dur) var(--ease);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .quick-btn:hover {
+            background: {{ theme_primary }};
+            border-color: {{ theme_primary }};
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .chat-input-box {
+            display: flex; gap: 8px;
+            padding: 10px 12px 14px;
+        }
+        .chat-input-box input {
+            flex: 1; padding: 9px 14px;
+            background: var(--surface-2);
+            border: 1.5px solid var(--border-med);
+            border-radius: var(--r-full);
+            color: var(--text-1);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.85rem; outline: none;
+            transition: border-color var(--dur);
+        }
+        .chat-input-box input:focus { border-color: {{ theme_primary }}; }
+        .chat-input-box input::placeholder { color: var(--text-3); }
+
+        /* Send button — primary */
+        .chat-input-box button {
+            width: 38px; height: 38px; border-radius: 50%;
+            background: {{ theme_primary }};
+            border: none; color: #fff; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; font-weight: 700;
+            transition: all var(--dur); flex-shrink: 0;
+            box-shadow: var(--shadow-p);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .chat-input-box button:hover { background: var(--primary-dark); transform: scale(1.05); }
+
+        @media (max-width: 768px) {
+            .chatbot-window { width: 300px; bottom: 66px; }
+        }
+
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {% if user.is_authenticated %}
-        <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
+{% if user.is_authenticated %}
+
+    <!-- ═══ SIDEBAR ═══ -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-stripe"></div>
+
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
                 {% if tenant and tenant.logo %}
-                    <img src="{{ logo_url }}" alt="Logo" class="sidebar-logo">
-                {% endif %}
-                <h1 class="sidebar-title">{{ tenant_name }}</h1>
-            </div>
-            
-            <nav class="sidebar-nav">
-                {% if user.profile.role == 'ADMIN' %}
-                    <div class="nav-item">
-                        <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" title="Dashboard">
-                            <!-- <span class="nav-icon">📊</span> -->
-                            <span class="nav-text">Dashboard</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a href="{% url 'customer_list' %}" class="nav-link {% if 'customer' in request.path %}active{% endif %}" title="Customers">
-                            <!-- <span class="nav-icon">👥</span> -->
-                            <span class="nav-text">Customers</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a href="{% url 'dish_list' %}" class="nav-link {% if 'dish' in request.path %}active{% endif %}" title="Dishes">
-                            <!-- <span class="nav-icon">🍛</span> -->
-                            <span class="nav-text">Dishes</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a href="{% url 'meal_list' %}" class="nav-link {% if 'meal' in request.path %}active{% endif %}" title="Meals">
-                            <!-- <span class="nav-icon">🍱</span> -->
-                            <span class="nav-text">Meals</span>
-                        </a>
-                    </div>
-                    <!-- <div class="nav-item">
-  <a href="{% url 'daily_menu_page' %}"
-     class="nav-link {% if request.resolver_match.url_name == 'daily_menu_page' %}active{% endif %}"
-     title="Daily Menu">
-    <span class="nav-text">Daily Menu</span>
-  </a>
-</div> -->
-
-<div class="nav-item">
-  <a href="{% url 'daily_menu_list' %}"
-     class="nav-link {% if request.resolver_match.url_name == 'daily_menu_list' %}active{% endif %}"
-     title="Menu List">
-    <span class="nav-text">Daily Menu</span>
-  </a>
-</div>
-
-                    <div class="nav-item">
-                        <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}" title="Daily Entry">
-                            <!-- <span class="nav-icon">📝</span> -->
-                            <span class="nav-text">Daily Entry</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}" title="Print Stickers">
-                            <!-- <span class="nav-icon">🏷️</span> -->
-                            <span class="nav-text">Print Stickers</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a href="{% url 'payments' %}" class="nav-link {% if 'payment' in request.path %}active{% endif %}" title="Payments">
-                            <!-- <span class="nav-icon">💰</span> -->
-                            <span class="nav-text">Payments</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-  <a href="{% url 'expense_dashboard' %}"
-     class="nav-link {% if 'expenses' in request.path %}active{% endif %}"
-     title="Expenses">
-    <span class="nav-text">Expenses</span>
-  </a>
-</div>
-
-                    <div class="nav-item">
-                        <a href="{% url 'reports' %}" class="nav-link {% if 'report' in request.path %}active{% endif %}" title="Reports">
-                            <!-- <span class="nav-icon">📈</span> -->
-                            <span class="nav-text">Reports</span>
-                        </a>
-                    </div>
+                    <img src="{{ logo_url }}" alt="Logo" class="sidebar-logo-img">
                 {% else %}
-                    <div class="nav-item">
-                        <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}" title="Daily Entry">
-                            <!-- <span class="nav-icon">📝</span> -->
-                            <span class="nav-text">Daily Entry</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}" title="Print Stickers">
-                            <span class="nav-text">Print Stickers</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a href="{% url 'dish_list' %}" class="nav-link {% if 'dish' in request.path %}active{% endif %}" title="Dishes">
-                            <!-- <span class="nav-icon">🍛</span> -->
-                            <span class="nav-text">Dishes</span>
-                        </a>
-                    </div>
+                    <div class="brand-logo-box">🍱</div>
                 {% endif %}
-            </nav>
-            
-            <div class="sidebar-footer">
+                <div>
+                    <div class="brand-name">{{ tenant_name }}</div>
+                    <div class="brand-sub">Service Management</div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            {% if user.profile.role == 'ADMIN' %}
+                <div class="nav-section">Overview</div>
+                <div class="nav-item">
+                    <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                        <span class="nav-icon">⊞</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">Operations</div>
+                <div class="nav-item">
+                    <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}">
+                        <span class="nav-icon">📋</span>
+                        <span class="nav-text">Daily Entry</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}">
+                        <span class="nav-icon">🏷</span>
+                        <span class="nav-text">Print Stickers</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'daily_menu_list' %}" class="nav-link {% if request.resolver_match.url_name == 'daily_menu_list' %}active{% endif %}">
+                        <span class="nav-icon">🗓</span>
+                        <span class="nav-text">Daily Menu</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">Catalogue</div>
+                <div class="nav-item">
+                    <a href="{% url 'customer_list' %}" class="nav-link {% if 'customer' in request.path %}active{% endif %}">
+                        <span class="nav-icon">👤</span>
+                        <span class="nav-text">Customers</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'dish_list' %}" class="nav-link {% if 'dish' in request.path %}active{% endif %}">
+                        <span class="nav-icon">🍛</span>
+                        <span class="nav-text">Dishes</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'meal_list' %}" class="nav-link {% if 'meal' in request.path %}active{% endif %}">
+                        <span class="nav-icon">🍱</span>
+                        <span class="nav-text">Meals</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">Finance</div>
+                <div class="nav-item">
+                    <a href="{% url 'payments' %}" class="nav-link {% if 'payment' in request.path %}active{% endif %}">
+                        <span class="nav-icon">₹</span>
+                        <span class="nav-text">Payments</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'expense_dashboard' %}" class="nav-link {% if 'expenses' in request.path %}active{% endif %}">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Expenses</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'reports' %}" class="nav-link {% if 'report' in request.path %}active{% endif %}">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">Reports</span>
+                    </a>
+                </div>
+
+            {% else %}
+                <div class="nav-item">
+                    <a href="{% url 'daily_entry_list' %}" class="nav-link {% if 'daily-entry' in request.path %}active{% endif %}">
+                        <span class="nav-icon">📋</span>
+                        <span class="nav-text">Daily Entry</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'print_stickers' %}" class="nav-link {% if 'sticker' in request.path %}active{% endif %}">
+                        <span class="nav-icon">🏷</span>
+                        <span class="nav-text">Print Stickers</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'dish_list' %}" class="nav-link {% if 'dish' in request.path %}active{% endif %}">
+                        <span class="nav-icon">🍛</span>
+                        <span class="nav-text">Dishes</span>
+                    </a>
+                </div>
+            {% endif %}
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar-sidebar">{{ user.username|first|upper }}</div>
                 <div class="user-info-sidebar">
                     <div class="user-name-sidebar">{{ user.username }}</div>
                     <div class="user-role-sidebar">{{ user.profile.get_role_display }}</div>
                 </div>
-<button
-  type="button"
-  class="btn btn-secondary w-full btn-sm"
-  title="Logout"
-  onclick="window.location.href='{% url 'logout' %}'"
->
-  <span class="logout-icon">⎋</span>
-  <span class="logout-text">Logout</span>
-</button>
-
+                <button type="button" class="btn-logout-sidebar" onclick="window.location.href='{% url 'logout' %}'" title="Sign out">
+                    <span class="logout-icon">⎋</span>
+                    <span class="logout-text">Sign out</span>
+                </button>
             </div>
-        </aside>
-        
-        <!-- Toggle Button -->
-        <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle Menu">
-            <span id="toggle-icon">◀</span>
-        </button>
-        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileMenu()"></div>
-        <!-- Main Content Wrapper -->
-        <div class="main-wrapper" id="mainWrapper">
-            <div class="top-bar no-print">
-                <div class="top-bar-title">{% block page_title %}{% endblock %}</div>
-                <div class="top-bar-actions">
-                    {% block top_actions %}{% endblock %}
-                </div>
-            </div>
-            
-            {% include 'tiffin_app/partials/messages.html' %}
-            
-            {% block content %}{% endblock %}
         </div>
-        
-        <!-- Mobile Menu Button -->
-<button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+    </aside>
 
-    {% else %}
-        {% include 'tiffin_app/partials/messages.html' %}
-        {% block content_unauthenticated %}{% endblock %}
-    {% endif %}
-    
-    <script src="{% static 'tiffin_app/js/main.js' %}"></script>
+    <!-- Toggle -->
+    <button class="sidebar-toggle no-print" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle Sidebar">
+        <span id="toggle-icon">◀</span>
+    </button>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileMenu()"></div>
+
+    <!-- ═══ MAIN ═══ -->
+    <div class="main-wrapper" id="mainWrapper">
+        <div class="top-bar no-print">
+            <div class="top-bar-title">{% block page_title %}{% endblock %}</div>
+            <div class="top-bar-actions">{% block top_actions %}{% endblock %}</div>
+        </div>
+
+        <div class="messages-wrap">
+            {% include 'tiffin_app/partials/messages.html' %}
+        </div>
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <button class="mobile-menu-btn no-print" onclick="toggleMobileMenu()">☰ Menu</button>
+
+{% else %}
+    {% include 'tiffin_app/partials/messages.html' %}
+    {% block content_unauthenticated %}{% endblock %}
+{% endif %}
+
+<script src="{% static 'tiffin_app/js/main.js' %}"></script>
 <script>
-  function _isMobile() {
-    return window.matchMedia("(max-width: 768px)").matches;
-  }
+function _isMobile() { return window.matchMedia("(max-width: 768px)").matches; }
 
-  function openMobileMenu() {
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("sidebarOverlay");
-    if (!sidebar) return;
-
-    // desktop collapse state remove in mobile
-    sidebar.classList.remove("collapsed");
+function openMobileMenu() {
+    const s = document.getElementById("sidebar"), o = document.getElementById("sidebarOverlay");
+    if (!s) return;
+    s.classList.remove("collapsed");
     document.getElementById("mainWrapper")?.classList.remove("sidebar-collapsed");
-
-    sidebar.classList.add("mobile-open");
-    overlay?.classList.add("show");
+    s.classList.add("mobile-open");
+    o?.classList.add("show");
     document.body.classList.add("no-scroll");
-  }
+}
 
-  function closeMobileMenu() {
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("sidebarOverlay");
-    if (!sidebar) return;
-
-    sidebar.classList.remove("mobile-open");
-    overlay?.classList.remove("show");
+function closeMobileMenu() {
+    const s = document.getElementById("sidebar"), o = document.getElementById("sidebarOverlay");
+    if (!s) return;
+    s.classList.remove("mobile-open");
+    o?.classList.remove("show");
     document.body.classList.remove("no-scroll");
-  }
+}
 
-  function toggleMobileMenu() {
-    const sidebar = document.getElementById("sidebar");
-    if (!sidebar) return;
+function toggleMobileMenu() {
+    document.getElementById("sidebar")?.classList.contains("mobile-open") ? closeMobileMenu() : openMobileMenu();
+}
 
-    if (sidebar.classList.contains("mobile-open")) closeMobileMenu();
-    else openMobileMenu();
-  }
+function toggleSidebar() {
+    if (_isMobile()) { toggleMobileMenu(); return; }
+    const s = document.getElementById("sidebar");
+    const mw = document.getElementById("mainWrapper");
+    const toggle = document.getElementById("sidebarToggle");
+    const icon = document.getElementById("toggle-icon");
+    s.classList.toggle("collapsed");
+    mw.classList.toggle("sidebar-collapsed");
+    const collapsed = s.classList.contains("collapsed");
+    icon.textContent = collapsed ? "▶" : "◀";
+    toggle.style.left = collapsed
+        ? "calc(var(--sidebar-coll) - 13px)"
+        : "calc(var(--sidebar-w) - 13px)";
+    localStorage.setItem("sidebarCollapsed", collapsed);
+}
 
-  function toggleSidebar() {
-    const sidebar = document.getElementById("sidebar");
-    const mainWrapper = document.getElementById("mainWrapper");
-    const toggleIcon = document.getElementById("toggle-icon");
-    if (!sidebar) return;
-
-    // ✅ Mobile: drawer open/close
-    if (_isMobile()) {
-      toggleMobileMenu();
-      return;
-    }
-
-    // ✅ Desktop: collapse behavior same as yours
-    sidebar.classList.toggle("collapsed");
-    mainWrapper.classList.toggle("sidebar-collapsed");
-
-    if (sidebar.classList.contains("collapsed")) {
-      toggleIcon.textContent = "▶";
-      localStorage.setItem("sidebarCollapsed", "true");
-    } else {
-      toggleIcon.textContent = "◀";
-      localStorage.setItem("sidebarCollapsed", "false");
-    }
-  }
-
-  // ✅ Remember desktop collapse state ONLY on desktop
-  document.addEventListener("DOMContentLoaded", function () {
-    // always close mobile on load
+document.addEventListener("DOMContentLoaded", () => {
     closeMobileMenu();
-
     if (_isMobile()) return;
-
-    const sidebarCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
-    if (sidebarCollapsed) {
-      const sidebar = document.getElementById("sidebar");
-      const mainWrapper = document.getElementById("mainWrapper");
-      const toggleIcon = document.getElementById("toggle-icon");
-
-      sidebar.classList.add("collapsed");
-      mainWrapper.classList.add("sidebar-collapsed");
-      toggleIcon.textContent = "▶";
+    if (localStorage.getItem("sidebarCollapsed") === "true") {
+        const s = document.getElementById("sidebar");
+        const mw = document.getElementById("mainWrapper");
+        const toggle = document.getElementById("sidebarToggle");
+        const icon = document.getElementById("toggle-icon");
+        s?.classList.add("collapsed");
+        mw?.classList.add("sidebar-collapsed");
+        if (icon) icon.textContent = "▶";
+        if (toggle) toggle.style.left = "calc(var(--sidebar-coll) - 13px)";
     }
-  });
+});
 
-  // ✅ close on clicking any nav link (mobile)
-  document.addEventListener("click", function (e) {
-    const link = e.target.closest("a.nav-link");
-    if (link && _isMobile()) closeMobileMenu();
-  });
-
-  // ✅ ESC closes drawer
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") closeMobileMenu();
-  });
-
-  // ✅ leaving mobile → remove overlay state
-  window.addEventListener("resize", function () {
-    if (!_isMobile()) closeMobileMenu();
-  });
+document.addEventListener("click", e => { if (e.target.closest("a.nav-link") && _isMobile()) closeMobileMenu(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeMobileMenu(); });
+window.addEventListener("resize", () => { if (!_isMobile()) closeMobileMenu(); });
 </script>
 
-    
-    {% if user.is_authenticated %}
-    <!-- AI Chatbot Widget with Tenant Colors -->
-    <div class="chatbot-widget" id="chatbot">
-        <button class="chatbot-toggle" onclick="toggleChatbot()">
-            <span class="chat-icon">💬</span>
-            <span class="chat-text">Help</span>
-        </button>
-        
-        <div class="chatbot-window" id="chatWindow" style="display: none;">
-            <div class="chatbot-header">
-                <h3>🤖 {{ tenant_name }} Assistant</h3>
-                <button onclick="toggleChatbot()" class="chat-close">×</button>
-            </div>
-            
-            <div class="chatbot-body" id="chatBody">
-                <div class="chat-message bot">
-                    <div class="message-bubble">
-                        Hi! मैं आपकी मदद कैसे कर सकता हूँ?<br><br>
-                        <strong>Quick Actions:</strong><br>
-                        • Create order<br>
-                        • Print stickers<br>
-                        • Add expense<br>
-                        • View reports
-                    </div>
+{% if user.is_authenticated %}
+<!-- ═══ CHATBOT ═══ -->
+<div class="chatbot-widget" id="chatbot">
+    <button class="chatbot-toggle" onclick="toggleChatbot()">
+        <span class="chat-icon">💬</span>
+        <span class="chat-text">HELP</span>
+    </button>
+
+    <div class="chatbot-window" id="chatWindow" style="display: none;">
+        <div class="chatbot-header">
+            <h3>✦ {{ tenant_name }} Assistant</h3>
+            <button onclick="toggleChatbot()" class="chat-close">×</button>
+        </div>
+
+        <div class="chatbot-body" id="chatBody">
+            <div class="chat-message bot">
+                <div class="message-bubble">
+                    नमस्ते! 🙏 मैं आपकी मदद कर सकता हूँ।<br><br>
+                    Quick actions नीचे हैं ↓
                 </div>
             </div>
-            
-            <div class="chatbot-footer">
-                <div class="quick-actions">
-                    <button class="quick-btn" onclick="chatAction('order')">📝 Order</button>
-                    <button class="quick-btn" onclick="chatAction('sticker')">🏷️ Stickers</button>
-                    <button class="quick-btn" onclick="chatAction('expense')">💰 Expense</button>
-                    <button class="quick-btn" onclick="chatAction('report')">📊 Report</button>
-                </div>
-                <div class="chat-input-box">
-                    <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
-                    <button onclick="sendMessage()">Send</button>
-                </div>
+        </div>
+
+        <div class="chatbot-footer">
+            <div class="quick-actions">
+                <button class="quick-btn" onclick="chatAction('order')">📝 Order</button>
+                <button class="quick-btn" onclick="chatAction('sticker')">🏷 Stickers</button>
+                <button class="quick-btn" onclick="chatAction('expense')">₹ Expense</button>
+                <button class="quick-btn" onclick="chatAction('report')">📊 Report</button>
+            </div>
+            <div class="chat-input-box">
+                <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()">➤</button>
             </div>
         </div>
     </div>
+</div>
 
-    <style>
-    .chatbot-widget {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 9999;
-    }
-
-    .chatbot-toggle {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: var(--primary);
-        border: 2px solid rgba(255,255,255,0.3);
-        color: white;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s;
-    }
-
-    .chatbot-toggle:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-        background: var(--primary-dark);
-    }
-
-    .chat-icon { font-size: 1.5rem; }
-    .chat-text { font-size: 0.7rem; margin-top: 2px; font-weight: 600; }
-
-    .chatbot-window {
-        position: absolute;
-        bottom: 80px;
-        right: 0;
-        width: 350px;
-        height: 500px;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        border: 2px solid var(--primary);
-    }
-
-    .chatbot-header {
-        background: var(--primary);
-        color: white;
-        padding: 15px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .chatbot-header h3 { margin: 0; font-size: 1.1rem; }
-
-    .chat-close {
-        background: rgba(255,255,255,0.2);
-        border: none;
-        color: white;
-        font-size: 1.5rem;
-        cursor: pointer;
-        width: 30px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        transition: all 0.2s;
-    }
-
-    .chat-close:hover { background: rgba(255,255,255,0.3); }
-
-    .chatbot-body {
-        flex: 1;
-        padding: 15px;
-        overflow-y: auto;
-        background: #f5f6fa;
-    }
-
-    .chat-message {
-        margin-bottom: 15px;
-        display: flex;
-    }
-
-    .chat-message.bot { justify-content: flex-start; }
-    .chat-message.user { justify-content: flex-end; }
-
-    .message-bubble {
-        max-width: 70%;
-        padding: 10px 15px;
-        border-radius: 12px;
-        line-height: 1.4;
-        font-size: 0.9rem;
-    }
-
-    .chat-message.bot .message-bubble {
-        background: white;
-        color: #333;
-        border-bottom-left-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .chat-message.user .message-bubble {
-        background: var(--primary);
-        color: white;
-        border-bottom-right-radius: 4px;
-    }
-
-    .chatbot-footer {
-        border-top: 1px solid #ddd;
-        background: white;
-    }
-
-    .quick-actions {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-        padding: 10px;
-        border-bottom: 1px solid #ddd;
-    }
-
-    .quick-btn {
-        padding: 8px 12px;
-        border: 1px solid var(--primary);
-        background: white;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.85rem;
-        transition: all 0.2s;
-        color: var(--primary);
-        font-weight: 500;
-    }
-
-    .quick-btn:hover {
-        background: var(--primary);
-        color: white;
-        transform: translateY(-2px);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-
-    .chat-input-box {
-        display: flex;
-        padding: 10px;
-        gap: 8px;
-    }
-
-    .chat-input-box input {
-        flex: 1;
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        border-radius: 20px;
-        outline: none;
-    }
-
-    .chat-input-box input:focus {
-        border-color: var(--primary);
-    }
-
-    .toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  user-select: none;
-}
-.toggle input {
-  display: none;
-}
-.toggle .track {
-  width: 44px;
-  height: 24px;
-  background: #e5e7eb;
-  border-radius: 999px;
-  position: relative;
-  transition: background 0.2s ease;
-}
-.toggle .thumb {
-  width: 20px;
-  height: 20px;
-  background: white;
-  border-radius: 999px;
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  transition: left 0.2s ease;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
-}
-.toggle input:checked + .track {
-  background: var(--primary, #1e40af);
-}
-.toggle input:checked + .track .thumb {
-  left: 22px;
-}
-.toggle .text {
-  font-weight: 600;
-  opacity: 0.85;
+<script>
+function toggleChatbot() {
+    const w = document.getElementById('chatWindow');
+    const isHidden = w.style.display === 'none';
+    w.style.display = isHidden ? 'flex' : 'none';
+    if (isHidden) w.style.flexDirection = 'column';
 }
 
+function chatAction(action) {
+    const urls = { order: '/daily-entry/', sticker: '/print-stickers/', expense: '/expenses/' };
+    if (action === 'report') { showReportOptions(); return; }
+    addBotMessage('Opening…');
+    setTimeout(() => window.location.href = urls[action], 600);
+}
 
-    .chat-input-box button {
-        padding: 8px 20px;
-        background: var(--primary);
-        color: white;
-        border: none;
-        border-radius: 20px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: all 0.2s;
-    }
+function showReportOptions() {
+    addBotMessage(`<span style="opacity:.7;font-size:.8rem">Choose a report:</span><br><br>
+        <button onclick="window.location.href='/reports'" class="quick-btn" style="display:block;width:100%;margin:4px 0;">📈 Sales Report</button>
+        <button onclick="window.location.href='/expenses/report'" class="quick-btn" style="display:block;width:100%;margin:4px 0;">₹ Expense Report</button>`);
+}
 
-    .chat-input-box button:hover {
-        background: var(--primary-dark);
-    }
+function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    if (!message) return;
+    addUserMessage(message);
+    input.value = '';
+    setTimeout(() => handleUserMessage(message.toLowerCase()), 400);
+}
 
-    @media (max-width: 768px) {
-        .chatbot-window {
-            width: 300px;
-            height: 450px;
-            bottom: 70px;
-        }
-        
-        .chatbot-toggle {
-            bottom: 80px;
-        }
-    }
-    </style>
+function addUserMessage(text) {
+    const b = document.getElementById('chatBody');
+    b.innerHTML += `<div class="chat-message user"><div class="message-bubble">${escapeHtml(text)}</div></div>`;
+    b.scrollTop = b.scrollHeight;
+}
 
-    <script>
-    function toggleChatbot() {
-        const chatWindow = document.getElementById('chatWindow');
-        chatWindow.style.display = chatWindow.style.display === 'none' ? 'block' : 'none';
-    }
+function addBotMessage(html) {
+    const b = document.getElementById('chatBody');
+    b.innerHTML += `<div class="chat-message bot"><div class="message-bubble">${html}</div></div>`;
+    b.scrollTop = b.scrollHeight;
+}
 
-    function chatAction(action) {
-        const actions = {
-            'order': '/daily-entry',
-            'sticker': '/print-stickers',
-            'expense': '/expenses',
-            'report': showReportOptions
-        };
-        
-        if (typeof actions[action] === 'function') {
-            actions[action]();
-        } else {
-            addBotMessage('Opening ' + action + ' page...');
-            setTimeout(() => window.location.href = actions[action], 800);
-        }
+function handleUserMessage(msg) {
+    if (msg.includes('order') || msg.includes('entry') || msg.includes('create')) {
+        addBotMessage('📝 Opening daily entry…'); setTimeout(() => window.location.href = '/daily-entry/', 800);
+    } else if (msg.includes('sticker') || msg.includes('print')) {
+        addBotMessage('🏷 Opening stickers…'); setTimeout(() => window.location.href = '/print-stickers/', 800);
+    } else if (msg.includes('expense') || msg.includes('kharcha') || msg.includes('खर्च')) {
+        addBotMessage('₹ Opening expenses…'); setTimeout(() => window.location.href = '/expenses/', 800);
+    } else if (msg.includes('customer')) {
+        addBotMessage('👤 Opening customers…'); setTimeout(() => window.location.href = '/customers/', 800);
+    } else if (msg.includes('report') || msg.includes('रिपोर्ट')) {
+        showReportOptions();
+    } else if (msg.includes('help') || msg.includes('मदद')) {
+        addBotMessage(`आप इन keywords use कर सकते हैं:<br><br>📝 <b>create order</b><br>🏷 <b>print stickers</b><br>₹ <b>add expense</b><br>👤 <b>customers</b><br>📊 <b>report</b>`);
+    } else {
+        addBotMessage(`समझ नहीं आया 🙏<br><span style="opacity:.65">"help" type करें for options</span>`);
     }
+}
 
-    function showReportOptions() {
-        addBotMessage(`
-            📊 Which report would you like?<br><br>
-            <button onclick="window.location.href='/reports'" class="quick-btn" style="display:block;margin:5px 0;width:100%;">📈 Sales Report</button>
-            <button onclick="window.location.href='/expenses/report'" class="quick-btn" style="display:block;margin:5px 0;width:100%;">💰 Expense Report</button>
-        `);
-    }
+function escapeHtml(t) {
+    return t.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+}
+</script>
+{% endif %}
 
-    function sendMessage() {
-        const input = document.getElementById('chatInput');
-        const message = input.value.trim();
-        
-        if (!message) return;
-        
-        addUserMessage(message);
-        input.value = '';
-        
-        setTimeout(() => {
-            handleUserMessage(message.toLowerCase());
-        }, 500);
-    }
-
-    function addUserMessage(text) {
-        const chatBody = document.getElementById('chatBody');
-        chatBody.innerHTML += `
-            <div class="chat-message user">
-                <div class="message-bubble">${escapeHtml(text)}</div>
-            </div>
-        `;
-        chatBody.scrollTop = chatBody.scrollHeight;
-    }
-
-    function addBotMessage(text) {
-        const chatBody = document.getElementById('chatBody');
-        chatBody.innerHTML += `
-            <div class="chat-message bot">
-                <div class="message-bubble">${text}</div>
-            </div>
-        `;
-        chatBody.scrollTop = chatBody.scrollHeight;
-    }
-
-    function handleUserMessage(message) {
-        let response = '';
-        
-        if (message.includes('order') || message.includes('entry') || message.includes('create')) {
-            response = '📝 Opening daily entry page...';
-            setTimeout(() => window.location.href = '/daily-entry/', 1000);
-        } else if (message.includes('sticker') || message.includes('print')) {
-            response = '🏷️ Opening print stickers page...';
-            setTimeout(() => window.location.href = '/print-stickers/', 1000);
-        } else if (message.includes('expense') || message.includes('kharcha') || message.includes('खर्चा')) {
-            response = '💰 Opening expense tracker...';
-            setTimeout(() => window.location.href = '/expenses/', 1000);
-        } else if (message.includes('customer')) {
-            response = '👥 Opening customers page...';
-            setTimeout(() => window.location.href = '/customers/', 1000);
-        } else if (message.includes('report') || message.includes('रिपोर्ट')) {
-            showReportOptions();
-            return;
-        } else if (message.includes('help') || message.includes('मदद')) {
-            response = `मैं आपकी इन चीज़ों में मदद कर सकता हूँ:<br><br>
-                📝 <strong>Order create</strong> - "create order"<br>
-                🏷️ <strong>Stickers print</strong> - "print stickers"<br>
-                💰 <strong>Expense add</strong> - "add expense"<br>
-                👥 <strong>Customers</strong> - "show customers"<br>
-                📊 <strong>Reports</strong> - "show report"`;
-        } else {
-            response = `❓ Sorry, मैं समझ नहीं पाया।<br><br>
-                Try: "create order", "print stickers", "add expense", "help"`;
-        }
-        
-        addBotMessage(response);
-    }
-
-    function escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        return text.replace(/[&<>"']/g, m => map[m]);
-    }
-    </script>
-    {% endif %}
-    
-    {% block extra_js %}{% endblock %}
+{% block extra_js %}{% endblock %}
 </body>
 </html>
