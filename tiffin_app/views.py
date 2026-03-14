@@ -293,6 +293,13 @@ def customer_add(request):
                 default_idx = 0
             default_label = raw_locations[default_idx]
 
+        lunch_portion = (request.POST.get("lunch_portion") or "FULL").upper()
+        dinner_portion = (request.POST.get("dinner_portion") or "FULL").upper()
+        if lunch_portion not in ("HALF", "FULL"):
+            lunch_portion = "FULL"
+        if dinner_portion not in ("HALF", "FULL"):
+            dinner_portion = "FULL"
+
         customer = Customer.objects.create(
             tenant=tenant,
             name=request.POST["name"],
@@ -300,6 +307,8 @@ def customer_add(request):
             email=request.POST.get("email") or None,
             delivery_location=default_label,
             meal_preference=meal_preference,
+            lunch_portion=lunch_portion,
+            dinner_portion=dinner_portion,
             food_type=food_type,
             daily_lunch=daily_lunch,
             daily_dinner=daily_dinner,
@@ -348,6 +357,10 @@ def customer_edit(request, pk):
         customer.contact_number = request.POST.get("contact_number", "")
         customer.email = request.POST.get("email") or None
         customer.meal_preference = request.POST.get("meal_preference") or "BOTH"
+        lp = (request.POST.get("lunch_portion") or "FULL").upper()
+        dp = (request.POST.get("dinner_portion") or "FULL").upper()
+        customer.lunch_portion = lp if lp in ("HALF", "FULL") else "FULL"
+        customer.dinner_portion = dp if dp in ("HALF", "FULL") else "FULL"
         customer.food_type = request.POST.get("food_type") or "VEG"
 
         customer.daily_lunch = request.POST.get("daily_lunch") == "on"

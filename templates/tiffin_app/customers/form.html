@@ -140,7 +140,7 @@
           </button>
         </div>
 
-        <!-- ✅ Meal + Daily in ONE ROW (width adjusted) -->
+        <!-- ✅ Meal + Portion + Daily in ONE ROW (width adjusted) -->
         <div class="form-row form-row-2">
           <div class="form-group">
             <label for="meal_preference" class="form-label">Meal Type *</label>
@@ -150,6 +150,22 @@
               <option value="BOTH"
                 {% if not customer or customer.meal_preference == "BOTH" or not customer.meal_preference %}selected{% endif %}
               >Both</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="lunch_portion" class="form-label">Lunch Portion</label>
+            <select id="lunch_portion" name="lunch_portion" class="form-control">
+              <option value="HALF" {% if customer and customer.lunch_portion == "HALF" %}selected{% endif %}>Half</option>
+              <option value="FULL" {% if not customer or customer.lunch_portion == "FULL" %}selected{% endif %}>Full</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="dinner_portion" class="form-label">Dinner Portion</label>
+            <select id="dinner_portion" name="dinner_portion" class="form-control">
+              <option value="HALF" {% if customer and customer.dinner_portion == "HALF" %}selected{% endif %}>Half</option>
+              <option value="FULL" {% if not customer or customer.dinner_portion == "FULL" %}selected{% endif %}>Full</option>
             </select>
           </div>
 

@@ -69,6 +69,11 @@ class Customer(models.Model):
         ("BOTH", "Both"),
     ]
 
+    PORTION_CHOICES = [
+        ("HALF", "Half"),
+        ("FULL", "Full"),
+    ]
+
     FOOD_TYPE_CHOICES = [
         ("VEG", "Veg"),
         ("NON_VEG", "Non-Veg"),
@@ -96,6 +101,16 @@ class Customer(models.Model):
         choices=MEAL_PREF_CHOICES,
         default="BOTH",
     )
+    lunch_portion = models.CharField(
+        max_length=10,
+        choices=PORTION_CHOICES,
+        default="FULL",
+    )
+    dinner_portion = models.CharField(
+        max_length=10,
+        choices=PORTION_CHOICES,
+        default="FULL",
+    )
     food_type = models.CharField(
         max_length=10,
         choices=FOOD_TYPE_CHOICES,
@@ -121,6 +136,12 @@ class Customer(models.Model):
             # If fields not present (early migration stage), fall back to existing value
             pass
         super().save(*args, **kwargs)
+
+    def get_portion_display(self) -> str:
+        """Return short label e.g. 'L: Half, D: Full' for display in lists."""
+        lp = getattr(self, "lunch_portion", "FULL") or "FULL"
+        dp = getattr(self, "dinner_portion", "FULL") or "FULL"
+        return f"L: {dict(self.PORTION_CHOICES).get(lp, lp)}, D: {dict(self.PORTION_CHOICES).get(dp, dp)}"
 
     def get_default_location_for_meal(self, meal_type: str) -> str:
         """
